@@ -1,66 +1,74 @@
 # PROGRESS — Autorreporte del jefe (cierre circuito 5C)
 
 > Bitácora viva. Spec fuente: `SPEC_CLIMA_AUTORREPORTE_JEFE_v1.md`.
-> Regla: cada fase se sella por separado con smoke de evidencia leída de vuelta
-> desde la base; el smoke se borra al sellar. Commits separados código/doc,
-> `git add` archivo por archivo, `git status --stat` antes de cada commit.
 > No pushear — Victor pushea.
 
-## Fases
-- **Fase A** — P1 (modelo) + P2 (endpoint) + P3 (permiso) → ✅ SELLADA (código+doc commiteados; Victor pushea)
-- **Fase B** — P4 (campo) + P5 (filtrado) → JUNTOS, dependencia dura. Pendiente
-- **Fase C** — P6 (correo) → pendiente
-- **Fase D** — P7 (Tab 2) → pendiente
+## Estado por fase
+- **Fase A** — P1 (modelo) + P2 (endpoint) + P3 (permiso) → ✅ **SELLADA** (commits
+  `d7e7749` código + `16d039b` doc + `284297f` fix voseo). No toca ninguna pantalla.
+- **Fase B** — filtrado + GET + campo en la card de **Tab 1** → ❌ **REVERTIDA 2026-08-01.**
+- **Fase C / D** — pendientes.
 
 ---
 
-## Fase A — checklist ✅
+## ⛔ Fase B REVERTIDA (2026-08-01) — LEER ANTES DE RETOMAR
 
-- [x] P1 — `model ClimaActionLogEntry` + back-reference `entries` en `ClimaActionLog`
-      (`prisma/schema.prisma`). `prisma validate` OK.
-- [x] P1 — `db push` a producción aplicado (cambio aditivo, tabla nueva
-      `clima_action_log_entries`). Prisma Client regenerado.
-- [x] P3 — `'clima:action-log:write'` en `permissions.ts` tras `clima:manage`.
-- [x] P2 — `POST /api/clima/action-log/route.ts` (nuevo). Guard de propiedad
-      (resolveDepartmentResponsable + `employeeId`), espejo del padre en `$transaction`.
-- [x] P2 — smoke contra handler real, 22/22 checks (200 ×2 + espejo, 403 ajeno,
-      403 employeeId null, 404 otra cuenta, 400 vacío, 400 201 chars) +
-      verificación post-cleanup en cero (por id y por `climaActionLogId`). Smoke BORRADO al sellar.
-- [x] `tsc --noEmit` 0 errores · `next build` limpio.
-- [x] Commit código Fase A (schema + permissions + route, add archivo por archivo).
-- [x] Commit doc Fase A.
+**Decisión de producto (Victor):** el campo de autorreporte **NO va en Tab 1**.
+**Va en Tab 2.** Cualquier sesión futura que retome esto **arranca desde Tab 2**,
+no desde la card de decisión de Tab 1 (`ClimaDecisionCard`). No volver a proponer
+Tab 1 — ya se construyó, se probó y se descartó.
 
-### Evidencia (nivel: trace data + código, leído de vuelta de la BD)
-- Smoke corrió contra el handler real; depto real `Gerencia E2E`
-  (`cmkq36fgf001ed5hgmbgla4n6`), responsable `cmkrlxw8i0003c6q5amursr0o`,
-  cuenta `cmfgedx7b00012413i92048wl`. Solo escribió `ClimaActionLog` +
-  `ClimaActionLogEntry`; cleanup por id exacto + accountId; ceros confirmados.
-- NO visto en pantalla (eso llega en Fase B, P4).
+**Qué se revirtió** (volvió a estado pre-Fase-B, `git checkout HEAD`):
+`ClimaDecisionCard.tsx`, `ClimaPathWorkspace.tsx`, `ClimaPlanDeptTab.tsx`,
+`ClimaCaseReview.tsx`, `action-plans/route.ts`, `action-plans/[planId]/route.ts`,
+`clima/action-log/route.ts` (le quedó SOLO el POST de Fase A), `clima-planes.ts`.
+Borrados: `ClimaAutorreporteBlock.tsx`, `climaDeptScope.ts`, y los 2 scripts smoke/fixture.
+
+**DB restaurada:** el fixture demo se limpió — entradas de prueba en cero,
+`User(admin@corporacionenterprise.cl).employeeId` de vuelta a `null`.
+
+**Lo que SÍ queda vigente de Fase A** (no se tocó): la tabla `ClimaActionLogEntry`,
+el permiso `clima:action-log:write`, y `POST /api/clima/action-log` con su guard de
+propiedad. El circuito de ESCRITURA existe; falta la superficie de UI (ahora en Tab 2).
+
+**El backlog dice la verdad** (commit `fffd4a3` revirtió la nota falsa `b7a2017`):
+los tres fail-open del mismo patrón siguen ABIERTOS — goals, clima, compliance
+(`SEC-ACTIONPLAN-DECISIONES`). El filtrado jerárquico de `/api/action-plans` NO se
+aplicó (era parte de Fase B). Si Tab 2 lee decisiones por departamento, ese filtro
+vuelve a hacer falta.
+
+### Hechos útiles descubiertos (para el intento en Tab 2)
+- Los endpoints genéricos `GET /api/action-plans` y `/[planId]` **no filtran** el JSON
+  `decisiones` por departamento (`route.ts:80-93`, `[planId]/route.ts:56-74`). Patrón
+  fail-closed a clonar si hace falta: `clima/action-plan/generate/route.ts:72-93`.
+- `employeeId` viaja `User.employeeId` → JWT (`login/route.ts:142`) → header
+  (`middleware.ts:215`) → `extractUserContext`. **0 de 12 usuarios del test account
+  tienen `employeeId` poblado** (backfill del vínculo diferido a nómina real): con login
+  normal, `canWrite`/guard de propiedad siempre da false. Sin ese backfill no hay demo
+  de escritura real sin tocar `User.employeeId` a mano (write reversible, con cuidado).
+- Card de decisión de Tab 1 = `ClimaDecisionCard.tsx` (por si sirve de referencia visual;
+  NO es donde va el campo).
 
 ---
 
-## Confirmaciones Gate 0 resueltas en esta sesión
-- **#3 `extractUserContext` devuelve `employeeId`** → SÍ. `AuthorizationService.ts`
-  `extractUserContext` → `employeeId: request.headers.get('x-employee-id') || null`
-  (Etapa 1 vínculo, `c1e08e6`). El guard de propiedad de P2 se apoya en esto.
-- #1 (nombre real card Tab 1) y #2 (filtrado depto en `/api/action-plans`) → son
-  de Fase B (P4/P5); se confirman con evidencia file:line al entregar Fase B.
+## Fase A — checklist ✅ (SELLADA, sin cambios)
 
-## Decisiones de Victor (2026-07-31)
-- **registeredBy:** el espejo del padre refleja la entrada más reciente COMPLETA
-  → P2 setea `registeredBy = userContext.employeeId` junto con `actionText` +
-  `registeredAt`. Corrección aplicada al spec §P2-6.
-- **Smoke / cleanup (condición dura):** cleanup SOLO por id exacto, en
-  `$transaction`, con `accountId` presente en TODA operación. NUNCA `deleteMany`
-  ni `updateMany` con filtros amplios. Precedente: un seed con `updateMany` sin
-  `accountId` corrompió 50 filas de `PerformanceRating` en este repo. Reusar la
-  cuenta de prueba existente `cmfgedx7b00012413i92048wl` (Corp Enterprise), no
-  crear cuenta nueva. **Mostrar el plan de cleanup antes de correr el smoke.**
-- **db push:** aprobado. Victor cierra el dev server antes; avisar cuando se vaya
-  a correr (EPERM en Windows si hay `node` corriendo).
+- [x] P1 — `model ClimaActionLogEntry` + back-reference en `ClimaActionLog`. `db push` aplicado.
+- [x] P3 — `'clima:action-log:write'` en `permissions.ts`.
+- [x] P2 — `POST /api/clima/action-log` (guard de propiedad + espejo del padre en `$transaction`).
+- [x] Smoke 22/22 (borrado al sellar) · `tsc` 0 · `next build` ✓ · commits código+doc.
+
+### Corrección de spec aplicada (vigente)
+- **§P2-6:** el espejo del padre refleja la entrada más reciente COMPLETA →
+  `registeredBy = userContext.employeeId` junto con `actionText` + `registeredAt`.
+
+---
+
+## Confirmaciones Gate 0 (vigentes)
+- **`extractUserContext` devuelve `employeeId`** → SÍ (Etapa 1 vínculo, `c1e08e6`).
 
 ## Deuda anotada (NO arreglar en este gate)
-- **Skill `focalizahr-api` §Vínculo desactualizada:** dice "Etapa 1 no iniciada /
-  `userContext.employeeId` aún no expuesto", pero el código muestra Etapa 1
-  SELLADA (`c1e08e6`) y `extractUserContext` ya devuelve `employeeId`. Corregir
-  la skill en su propio momento, fuera de este gate.
+- **Skill `focalizahr-api` §Vínculo desactualizada:** dice "Etapa 1 no iniciada", pero
+  el código muestra Etapa 1 SELLADA (`c1e08e6`). Corregir en su propio momento.
+- **Voseo en `ClimaPlanDeptTab.humanError`** (flujo de decisiones 5D, no autorreporte):
+  ya está registrado en el backlog (deuda de idioma 2026-07-27). No es de este gate.
