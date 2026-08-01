@@ -1,9 +1,25 @@
 # PROGRESS — Autorreporte del jefe (cierre circuito 5C)
 
-> Bitácora viva. Spec fuente: `SPEC_CLIMA_AUTORREPORTE_JEFE_v1.md`.
+> Bitácora viva. Spec fuente VIGENTE: `SPEC_ATACAR_CAUSA_TAB2_v2.md`
+> (reemplaza a `SPEC_CLIMA_AUTORREPORTE_JEFE_v1.md`; el campo va en Tab 2, no Tab 1).
 > No pushear — Victor pushea.
 
-## Estado por fase
+## Gate v2 — "Atacar la causa" (Tab 2) — EN CURSO
+- **V1** `GET /api/clima/action-log` → ✅ **SELLADO** (2026-08-01). Se agregó el GET
+  al route existente (POST de Fase A intacto) + tipos nuevos `src/types/clima-atacar-causa.ts`.
+  - Modo lista `?planId&departmentId`: plan aprobado acotado al depto (solo aceptar/modificar,
+    rechazar/pospuesto y otros deptos fuera) + logs unidos por `triggerRef`; `canWrite` resuelto
+    en server (responsable === viewer, false si `employeeId` null). Modo entradas `?logId&limit&offset`.
+  - **Guard de lectura INVERTIDO** (decisión de Victor): global (`GLOBAL_ACCESS_ROLES` =
+    FOCALIZAHR_ADMIN/ACCOUNT_OWNER/HR_ADMIN/HR_MANAGER/HR_OPERATOR/CEO, `permissions.ts:820-827`)
+    sin restricción; TODO el resto acotado a {propio ∪ hijos}, fail-closed sin departmentId propio.
+    Cierra la fuga tipo `GET /api/goals`. NO depende de `/api/action-plans` (su fail-open queda como está).
+  - Smoke real 20/20 (filtrado, unión, canWrite, guard incl. G4 cross-depto, paginación, 404,
+    borrador→vacío) + re-lectura post-cleanup por id en cero **incluido el ActionPlan**. Smoke borrado al sellar.
+- **V2** vista `ClimaAtacarCausaScreen.tsx` (abre desde `ClimaPlanPersonaTab`, quitar gate `:194`) → PENDIENTE (skills design/narrativas/notificaciones antes; visto en pantalla por Victor).
+- **V3** `action_url` del correo (`ClimaActionLogService.ts:141-157`) → PENDIENTE.
+
+## Estado por fase (histórico)
 - **Fase A** — P1 (modelo) + P2 (endpoint) + P3 (permiso) → ✅ **SELLADA** (commits
   `d7e7749` código + `16d039b` doc + `284297f` fix voseo). No toca ninguna pantalla.
 - **Fase B** — filtrado + GET + campo en la card de **Tab 1** → ❌ **REVERTIDA 2026-08-01.**
