@@ -138,6 +138,14 @@ Cada ítem lleva: **Tipo** · **Esfuerzo** · **Prioridad**.
 - **Alcance:** solo roles con login (ACCOUNT_OWNER/HR/CEO/AREA_MANAGER/EVALUATOR); participantes de encuesta usan `uniqueToken` (sin cuenta). No es hueco abierto: dependencia frágil en disciplina manual (agravada por Ley 21.719).
 - **Decisión de fondo (arquitectónica, no parche):** correlación formal `User↔Employee` o hook de offboarding que al marcar Employee INACTIVE / registrar Exit desactive el `User` correspondiente.
 
+### 🆕 SEC-ACTIONPLAN-DECISIONES · `/api/action-plans` no filtra el JSON `decisiones` por departamento (fail-open) — PENDIENTE DECISIÓN ARQUITECTURA
+**Estado:** 🆕 pendiente de decisión para **compliance** (clima se cierra en el gate Autorreporte del Jefe, Fase B). Descubierto 2026-07-31 mapeando P5 del gate 5C.
+**Patrón:** `ActionPlan` es UNA fila con las decisiones de **todos** los departamentos en un JSON. Los endpoints genéricos `GET /api/action-plans` (`route.ts:80-93`) y `GET /api/action-plans/[planId]` (`[planId]/route.ts:56-74`) filtran solo por `accountId`+`moduleType` y devuelven el JSON completo. `compliance:view` (`permissions.ts:603-611`) **y** `clima:view` (`:625-633`) **incluyen AREA_MANAGER** → un gerente recibe hoy las decisiones de **toda la empresa**, no solo su subárbol.
+- **Compliance es MÁS grave que clima.** Compliance (Ambiente Sano / Ley Karin) expone **indicios de conducta con departamento identificable**, no percepciones agregadas. La fuga cross-departamental de compliance es cualitativamente peor.
+- **Tercer fail-open del mismo patrón** en el proyecto: `GET /api/goals` (citado en el spec 5C), clima y compliance. Misma raíz: rol jerárquico con permiso `:view` amplio sobre un endpoint que no aplica las 3 capas.
+- **Clima queda cerrado** en Fase B del gate 5C: el filtro se scope-a a `moduleType==='clima'` (clona el patrón fail-closed de `generate/route.ts:72-93`), **sin tocar compliance** a propósito (decisión de Victor 2026-07-31).
+- **Fix pendiente (compliance):** replicar el mismo filtro jerárquico fail-closed para `moduleType==='compliance'`, verificando primero que `ComplianceDecisionItem` lleve `departmentId` (si no, definir cómo se scope-a). **NO tocar sin decisión de Arquitectura** — mismo proceso que SEC-TEST/SEC-EMAIL.
+
 ---
 
 ## P0 — Bloqueadores de go-live / seguridad crítica
