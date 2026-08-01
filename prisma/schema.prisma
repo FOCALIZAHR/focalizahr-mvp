@@ -4088,9 +4088,34 @@ model ClimaActionLog {
   verdictCampaignId String?   @map("verdict_campaign_id")
   llmClassification Json?     @map("llm_classification")
 
+  entries           ClimaActionLogEntry[]
+
   @@unique([actionPlanId, triggerRef])
   @@index([accountId, departmentId])
   @@map("clima_action_logs")
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// CLIMA ACTION LOG ENTRY — Autorreporte del jefe (Gate 5C, cierre del circuito)
+// Tabla hija de ClimaActionLog. Cada fila es una entrada de texto que el
+// responsable del departamento escribe sobre lo que hizo con el hallazgo.
+// El padre (ClimaActionLog.actionText/registeredAt/registeredBy) queda como
+// ESPEJO de la entrada más reciente, sincronizado en la misma transacción por
+// el endpoint de escritura. ActionEffectivenessService sigue leyendo actionText
+// (no toca esta tabla). Ver .claude/tasks/SPEC_CLIMA_AUTORREPORTE_JEFE_v1.md §P1.
+// ════════════════════════════════════════════════════════════════════════════
+model ClimaActionLogEntry {
+  id               String   @id @default(cuid())
+  accountId        String   @map("account_id")
+  climaActionLogId String   @map("clima_action_log_id")
+  text             String   @db.VarChar(200)
+  createdAt        DateTime @default(now()) @map("created_at")
+  createdBy        String?  @map("created_by")   // Employee.id del autor
+
+  climaActionLog   ClimaActionLog @relation(fields: [climaActionLogId], references: [id], onDelete: Cascade)
+
+  @@index([accountId, climaActionLogId])
+  @@map("clima_action_log_entries")
 }
 
 // ════════════════════════════════════════════════════════════════════════════

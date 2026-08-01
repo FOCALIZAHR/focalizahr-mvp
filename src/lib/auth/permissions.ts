@@ -638,6 +638,22 @@ export const PERMISSIONS = {
     'HR_MANAGER',
     'HR_OPERATOR'
   ],
+  // Autorreporte del jefe (Gate 5C): escribir la bitácora de un hallazgo de clima.
+  // Amplio a propósito — AREA_MANAGER incluido. El permiso solo ABRE la puerta;
+  // la protección real es el guard de PROPIEDAD del endpoint (POST
+  // /api/clima/action-log): resolveDepartmentResponsable + comparar employeeId.
+  // Un rol global con este permiso igual recibe 403 si no es el responsable
+  // resuelto del departamento. No se toca clima:manage (aprobar planes es otra
+  // capacidad, solo RRHH). Ver SPEC_CLIMA_AUTORREPORTE_JEFE_v1.md §P3.
+  'clima:action-log:write': [
+    'FOCALIZAHR_ADMIN',
+    'ACCOUNT_OWNER',
+    'HR_ADMIN',
+    'HR_MANAGER',
+    'HR_OPERATOR',
+    'CEO',
+    'AREA_MANAGER'
+  ],
 
   // ─────────────────────────────────────────────────────────────────────────
   // VITALS (portada de entrada "Signos Vitales" — SPEC_HOME_SIGNOS_VITALES_v1 §4)
