@@ -379,6 +379,68 @@ Entries con texto del smoke = 0
 
 ---
 
+## AS-BUILT F2 — ✅ 2026-08-03
+
+**Código** (`tsc --noEmit` limpio):
+
+- `DepartmentResponsableService.ts` — `computeResponsableChains()`, versión BULK de
+  `resolveResponsableChain` en **2 queries** para N departamentos. Sin fallback a
+  `account_admin`: al caller bulk no le sirve el admin, le sirve saber si el viewer
+  responde o no. Lleva el mismo aviso ⚠️ de regla duplicada.
+- `src/types/clima-atacar-causa.ts` — `ClimaBitacoraAuthorRelation`,
+  `ClimaAtacarCausaEntryAuthorDTO`, y `author?` **opcional** en la entry.
+- `src/types/clima-bitacora.ts` — NUEVO. `ClimaBitacoraItemDTO` +
+  `ClimaBitacoraMineResponse`.
+- `action-log/route.ts` — `getMine()`, tercer modo. Plan aprobado → logs → cadenas
+  bulk → filtro persona-céntrico → decisiones por `triggerRef` → entradas con autor.
+
+**Desvíos del plan, deliberados:**
+
+1. `author` quedó **opcional**, no requerido. Requerido habría obligado a los modos
+   lista y entradas (los de Tab 2) a resolver autores que Tab 2 no muestra: queries de
+   más en una ruta que no los usa. Verificado en el smoke (6n).
+2. **No** se agregó `category` a `ClimaAtacarCausaDecisionDTO`. La Bitácora usa
+   `ClimaBitacoraItemDTO`, que ya lo trae. Agregarlo al DTO de Tab 2 era tocar su
+   contrato sin ningún consumidor.
+
+**Smoke** `prisma/scripts/smoke-clima-actionlog-mine.ts`: **37 PASS · 0 FAIL** con
+`--commit` (20 de ellos read-only).
+
+Cubre: 8 hallazgos en 2 departamentos sin que el cliente elija · `category` presente y
+coincidente con el sufijo del `triggerRef` en los 8 · `count=1` con el mismo
+`pendingCount` y sin items · responsable sin hallazgos, fuera de cadena, rol global,
+campaña sin plan aprobado y sin `employeeId` → 200 vacío · sin `campaignId` 400 · sin
+`clima:view` 403 · autoría con `relation` `'responsable'` y `'superior'` · el superior
+ve los departamentos de abajo · Tab 2 no paga el join.
+
+**Fixture ejecutado y revertido.** Verificación independiente, fuera del `finally`:
+
+```
+Gerencia Comercial.responsableId = null
+Departamentos con responsable = 4        (igual que antes)
+Logs del plan = 17 | con espejo NO nulo = 0
+ClimaActionLogEntry totales en la cuenta = 0
+```
+
+---
+
+## ⚠️ ABIERTA — consecuencia de F1 sobre Tab 2 (decisión de Victor)
+
+F1 amplió quién escribe. **Antes**, todas las entradas de un hallazgo venían del único
+responsable, así que "quién escribió" era implícito y no hacía falta mostrarlo.
+**Ahora** pueden venir del responsable o de cualquier superior, y el historial read-only
+de Tab 2 (`ClimaAtacarCausaScreen.tsx:249-259`) muestra solo texto y fecha.
+
+Resultado: RRHH puede leer dos entradas del mismo hallazgo sin saber que las escribieron
+personas distintas.
+
+No se tocó porque la instrucción fue explícita: Tab 2 no se toca. El dato ya existe
+(`ClimaActionLogEntry.createdBy`) y el DTO ya soporta `author`; sería llenarlo también en
+el modo lista y renderizarlo. **Esperando decisión: se arregla, o va a
+`PENDIENTES_ACTIVOS_EX_CLIMA.md`.**
+
+---
+
 ## D7 — ✅ RESUELTO (fixture ejecutado y revertido, ver as-built)
 
 El caso positivo "superior en la jerarquía" **no tiene datos reales**: de 57
