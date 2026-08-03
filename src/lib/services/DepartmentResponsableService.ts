@@ -88,6 +88,102 @@ export async function resolveDepartmentResponsable(params: {
 }
 
 /**
+ * Todos los employeeIds que responden por `departmentId` en LÍNEA VERTICAL ASCENDENTE:
+ * el responsable resuelto (walk-up) MÁS los responsables de cada ancestro por encima.
+ *
+ * Existe porque el autorreporte del jefe (Gate 5C) lo escribe el responsable del
+ * departamento O cualquiera ARRIBA de él: si el jefe de área no registró qué hizo con
+ * el hallazgo, su gerente tiene que poder hacerlo. Sin esta ampliación, el circuito
+ * se corta en la única persona que quizá esté de vacaciones.
+ *
+ * SOLO ascendente. Un responsable de un depto HIJO no responde por su padre, y los
+ * departamentos HERMANOS quedan fuera. Es la mitad ascendente de la regla de rama
+ * vertical de getResponsableChainDepartmentIds (que sí incluye descendientes, porque
+ * responde otra pregunta: quién es ELEGIBLE como responsable, no quién responde YA).
+ *
+ * `resolved` es idéntico a lo que devuelve resolveDepartmentResponsable: el PRIMER
+ * responsable activo subiendo desde el propio departmentId, con fallback a
+ * Account.adminEmail. Se devuelve junto al set para que el caller distinga
+ * "responsable directo" de "superior" sin volver a resolver.
+ *
+ * Fail-closed: si nadie en la cadena tiene responsable activo, `chainEmployeeIds`
+ * queda VACÍO (el fallback account_admin no aporta employeeId) y nadie escribe.
+ *
+ * ⚠️ El walk-up vive en DOS funciones (esta y resolveDepartmentResponsable) por la
+ * misma razón que computeResponsableCandidateCounts existe aparte: los costos son
+ * opuestos. resolveDepartmentResponsable CORTA en el primer responsable (1 salto en
+ * el caso común) y la llaman rutas calientes como by-person, una vez por departamento;
+ * ésta recorre la cadena ENTERA. Si cambia la regla del walk-up, cambiarla en las dos.
+ *
+ * Sube por parentId crudo, NO por getChildDepartmentIds (LRU 15 min): la respuesta
+ * gatea ESCRITURA y no puede servir jerarquía vieja.
+ * Multi-tenant: cada salto valida accountId. Mismo cap de profundidad contra ciclos.
+ */
+export async function resolveResponsableChain(params: {
+  departmentId: string;
+  accountId: string;
+}): Promise<{ resolved: DepartmentResponsableResult; chainEmployeeIds: Set<string> }> {
+  const { departmentId, accountId } = params;
+
+  const chainEmployeeIds = new Set<string>();
+  let resolved: DepartmentResponsableResult | null = null;
+
+  let currentId: string | null = departmentId;
+  let depth = 0;
+
+  while (currentId && depth < MAX_DEPTH) {
+    // Guard multi-tenant: el depto debe pertenecer a la cuenta.
+    const dept: { id: string; parentId: string | null; responsableId: string | null } | null =
+      await prisma.department.findFirst({
+        where: { id: currentId, accountId },
+        select: { id: true, parentId: true, responsableId: true },
+      });
+
+    if (!dept) break; // depto ajeno/inexistente → corta la cadena acá
+
+    if (dept.responsableId) {
+      const emp = await prisma.employee.findFirst({
+        where: { id: dept.responsableId, accountId, isActive: true },
+        select: { id: true, fullName: true, email: true },
+      });
+      if (emp) {
+        chainEmployeeIds.add(emp.id);
+        // El PRIMERO encontrado es el responsable resuelto (misma semántica que
+        // resolveDepartmentResponsable); los de más arriba son sus superiores.
+        if (!resolved) {
+          resolved = {
+            source: 'responsable',
+            departmentId: dept.id,
+            employeeId: emp.id,
+            email: emp.email,
+            name: emp.fullName,
+          };
+        }
+      }
+      // responsable seteado pero inactivo/ausente → seguir subiendo
+    }
+
+    currentId = dept.parentId;
+    depth += 1;
+  }
+
+  if (!resolved) {
+    // Nadie activo en toda la cadena → mismo fallback que resolveDepartmentResponsable.
+    const account = await prisma.account.findUnique({
+      where: { id: accountId },
+      select: { adminEmail: true, adminName: true },
+    });
+    resolved = {
+      source: 'account_admin',
+      email: account?.adminEmail ?? '',
+      name: account?.adminName ?? 'Administrador',
+    };
+  }
+
+  return { resolved, chainEmployeeIds };
+}
+
+/**
  * Ids de departamento cuyos empleados pueden ser RESPONSABLES de `departmentId`:
  * el propio departamento + sus ancestros hasta la raíz + todos sus descendientes.
  * Los departamentos HERMANOS quedan fuera a propósito.

@@ -8,10 +8,15 @@
 // ActionEffectivenessService sigue leyendo actionText — no se toca.
 //
 // Seguridad (spec §P2): permiso amplio 'clima:action-log:write' abre la puerta;
-// la protección real es el GUARD DE PROPIEDAD — solo el responsable resuelto del
-// departamento (resolveDepartmentResponsable + comparación de employeeId) puede
-// escribir. Nunca se resuelve identidad por email (regla vigente del proyecto).
-// Ver .claude/tasks/SPEC_ATACAR_CAUSA_TAB2_v2.md §1 (Fase A) y §V1 (el GET).
+// la protección real es el GUARD DE LÍNEA JERÁRQUICA — escriben el responsable
+// resuelto del departamento Y sus superiores en línea ascendente
+// (resolveResponsableChain + pertenencia de employeeId a la cadena). Si el jefe de
+// área no registró qué hizo, su gerente tiene que poder hacerlo; sin eso el circuito
+// se corta en una sola persona. Ramas HERMANAS quedan fuera: alguien con
+// 'clima:view' pero sin relación vertical con el departamento recibe 403.
+// Nunca se resuelve identidad por email (regla vigente del proyecto).
+// Ver .claude/tasks/SPEC_ATACAR_CAUSA_TAB2_v2.md §1 (Fase A) y §V1 (el GET), y
+// .claude/tasks/PLAN_BITACORA_ACCIONES_CLIMA.md §F1 (la ampliación).
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
@@ -21,7 +26,7 @@ import {
   getChildDepartmentIds,
   GLOBAL_ACCESS_ROLES,
 } from '@/lib/services/AuthorizationService';
-import { resolveDepartmentResponsable } from '@/lib/services/DepartmentResponsableService';
+import { resolveResponsableChain } from '@/lib/services/DepartmentResponsableService';
 import type { ClimaDecisionItem } from '@/types/clima-planes';
 import type {
   ClimaAtacarCausaDecisionDTO,
@@ -36,37 +41,43 @@ const ENTRIES_PAGE_DEFAULT = 20; // modo entradas
 const ENTRIES_PAGE_MAX = 50;
 
 /**
- * ¿El viewer es el responsable RESUELTO (walk-up) del departamento pedido? Es la MISMA
- * condición que decide `canWrite` en el POST — fuente única para que leer y escribir no
- * diverjan. false sin `employeeId` (vínculo Employee↔User no poblado → no hay identidad
- * que comparar; nunca se resuelve por email). Resuelve con `resolveDepartmentResponsable`,
- * que NO está cacheado.
+ * ¿El viewer está en la LÍNEA JERÁRQUICA del departamento pedido? Es decir: ¿es su
+ * responsable resuelto (walk-up), o el responsable de algún ancestro por encima?
+ *
+ * Es la MISMA condición que decide `canWrite` en el POST — fuente única para que leer y
+ * escribir no diverjan. false sin `employeeId` (vínculo Employee↔User no poblado → no hay
+ * identidad que comparar; nunca se resuelve por email). Resuelve con
+ * `resolveResponsableChain`, que NO está cacheado.
+ *
+ * Ramas HERMANAS quedan fuera por construcción: la cadena es solo ascendente.
  */
-async function isViewerDeptResponsable(
+async function isViewerInResponsableChain(
   userContext: { accountId: string; employeeId: string | null },
   departmentId: string
 ): Promise<boolean> {
   if (!userContext.employeeId) return false;
-  const responsable = await resolveDepartmentResponsable({
+  const { chainEmployeeIds } = await resolveResponsableChain({
     departmentId,
     accountId: userContext.accountId,
   });
-  return (
-    responsable.source === 'responsable' && responsable.employeeId === userContext.employeeId
-  );
+  return chainEmployeeIds.has(userContext.employeeId);
 }
 
 /**
  * Guard de lectura por departamento (V1). Tres puertas, en orden de costo creciente:
  *   1. Rol GLOBAL (GLOBAL_ACCESS_ROLES): ve toda la cuenta.
  *   2. Subárbol del JWT: {departmentId propio ∪ descendientes} (getChildDepartmentIds, cacheado).
- *   3. Responsable resuelto del depto pedido: el walk-up (resolveDepartmentResponsable) puede
- *      hacer a alguien responsable de un depto FUERA de su subárbol JWT — p.ej. el responsable
- *      de una gerencia responde por un hijo sin responsable propio sin tenerlo en su token.
+ *   3. Línea jerárquica del depto pedido (resolveResponsableChain): su responsable resuelto
+ *      O cualquier superior ascendente. El walk-up puede hacer a alguien responsable de un
+ *      depto FUERA de su subárbol JWT — p.ej. el responsable de una gerencia responde por un
+ *      hijo sin responsable propio sin tenerlo en su token.
  *      `canWrite ⟹ read`: si puede ESCRIBIR el autorreporte, tiene que poder LEER el plan; sin
- *      esta puerta el jefe que llega por el correo de los 30 días se lleva un 403.
+ *      esta puerta el jefe que llega por el correo de los 30 días se lleva un 403. Y al
+ *      ampliarse la escritura a los superiores, la lectura los acompaña por la misma razón:
+ *      registrar sin poder ver lo ya registrado es escribir a ciegas (decisión Victor,
+ *      2026-08-03). La ampliación es VERTICAL: ramas hermanas siguen recibiendo 403.
  *
- * La resolución del responsable (query walk-up, NO cacheada) se paga SOLO si 1 y 2 fallan.
+ * La resolución de la cadena (query walk-up, NO cacheada) se paga SOLO si 1 y 2 fallan.
  * Si el caller ya la calculó (el `canWrite` del modo lista), la pasa en `viewerIsResponsable`
  * y no se vuelve a resolver — nunca se resuelve dos veces en un mismo request.
  *
@@ -96,10 +107,10 @@ async function isDepartmentReadDenied(
     ]);
     if (allowed.has(departmentId)) return false;
   }
-  // 3. Responsable resuelto (walk-up). Reusa el cálculo de canWrite si vino; si no, resuelve.
-  const isResponsable =
-    viewerIsResponsable ?? (await isViewerDeptResponsable(userContext, departmentId));
-  return !isResponsable;
+  // 3. Línea jerárquica (walk-up). Reusa el cálculo de canWrite si vino; si no, resuelve.
+  const inChain =
+    viewerIsResponsable ?? (await isViewerInResponsableChain(userContext, departmentId));
+  return !inChain;
 }
 
 // Shape del body. El CONTENIDO de `text` (trim > 0, <= 200) se valida DESPUÉS del
@@ -179,12 +190,12 @@ export async function GET(request: NextRequest) {
         { status: 400 }
       );
     }
-    // canWrite (¿el viewer es el responsable resuelto de este depto?) y la 3ª puerta del
+    // canWrite (¿el viewer está en la línea jerárquica de este depto?) y la 3ª puerta del
     // guard de lectura comparten la MISMA resolución (mismo departmentId) → se calcula UNA
     // vez y se reusa. En modo lista canWrite siempre se necesita para la respuesta, así que
     // la resolución no es "de más"; la puerta 3 solo la aprovecha. (En modo entradas, sin
     // canWrite, el guard la resuelve lazy: solo si global y subárbol fallan.)
-    const canWrite = await isViewerDeptResponsable(userContext, departmentId);
+    const canWrite = await isViewerInResponsableChain(userContext, departmentId);
     if (await isDepartmentReadDenied(userContext, departmentId, canWrite)) {
       return NextResponse.json({ success: false, error: 'Sin acceso a este departamento' }, { status: 403 });
     }
@@ -290,14 +301,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Hallazgo no encontrado' }, { status: 404 });
     }
 
-    // 4. Guard de propiedad — solo el responsable resuelto del departamento escribe.
-    const responsable = await resolveDepartmentResponsable({
+    // 4. Guard de línea jerárquica — escriben el responsable resuelto del departamento
+    //    y sus superiores ascendentes. Ramas hermanas quedan fuera (la cadena es solo
+    //    ascendente por construcción en resolveResponsableChain).
+    const { resolved, chainEmployeeIds } = await resolveResponsableChain({
       departmentId: log.departmentId,
       accountId: userContext.accountId,
     });
-    if (responsable.source !== 'responsable') {
+    if (resolved.source !== 'responsable') {
+      // Nadie en toda la cadena tiene responsable activo → solo queda el fallback
+      // account_admin, que no aporta employeeId. Fail-closed: no escribe nadie.
       return NextResponse.json(
-        { success: false, error: 'No eres el responsable de este departamento' },
+        { success: false, error: 'No eres responsable de este departamento' },
         { status: 403 }
       );
     }
@@ -313,9 +328,9 @@ export async function POST(request: NextRequest) {
         { status: 403 }
       );
     }
-    if (responsable.employeeId !== userContext.employeeId) {
+    if (!chainEmployeeIds.has(userContext.employeeId)) {
       return NextResponse.json(
-        { success: false, error: 'No eres el responsable de este departamento' },
+        { success: false, error: 'No eres responsable de este departamento' },
         { status: 403 }
       );
     }
