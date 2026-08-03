@@ -49,6 +49,9 @@
 - **Ya corregido esta sesión:** `climaTab2Content.ts` completo (Fase 3 Tab 2, 9 strings) + `create-meta/route.ts` ("Asigná"→"Asigna").
 - **PENDIENTE — barrido de los ~13 archivos restantes** (Goals/Efficiency/DD_PREV/Clima Tab 1). Toca copy **sellada** de varios módulos → su propia sesión con **OK explícito**. NO tocar sin ese OK. 🎨 · M · **P3**.
 
+**2026-08-03 — Deuda de diseño: cuerpo de `ClimaAtacarCausaScreen` (Tab 2 "Atacar la causa"):**
+- La vista read-only ya tiene **header de portada ejecutiva** (protagonista: depto + responsable + número hero de focos), pero el **CUERPO sigue siendo una lista** donde los N hallazgos pesan igual (sin jerarquía real entre ellos). Rediseñar la jerarquía del cuerpo **cuando el contenido del diccionario `TAB2_ATACAR_SCREEN` sea el REAL** (hoy PROVISIONAL): con textos definitivos la jerarquía se lee distinta, y ordenar por severidad requeriría además sumar `isSystemic`/`level` al DTO del GET V1. **No rediseñar antes.** 🎨 · S/M · **P3**. (Deuda ligada: el copy PROVISIONAL de ese diccionario.)
+
 ---
 
 ## Modelo de priorización
