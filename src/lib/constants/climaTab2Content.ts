@@ -108,10 +108,37 @@ export const TAB2_META_GATE = {
   needsResponsable: 'Asigna un responsable primero.',
 } as const;
 
-/** Gate del PDI (Fase 3 Blocker 2): el camino de desarrollo aún no es accionable desde acá.
- *  Copy user-facing (sin lenguaje interno de "pantalla"), presente factual, sin plazo. */
+/** Gate de "Atacar la causa" (Tab 2, V2): la vista necesita un plan APROBADO como origen. */
 export const TAB2_PDI_GATE = {
-  noScreen: 'El plan de desarrollo no está disponible desde aquí por ahora.',
+  needsApprovedPlan: 'Para atacar la causa, el plan debe aprobarse primero en «Por departamento».',
+} as const;
+
+/**
+ * Pantalla "Atacar la causa" (Tab 2, V2) — el responsable ve el plan aprobado de su
+ * departamento y registra lo que hizo. Captura, NO evalúa: sin veredicto/score/semáforo.
+ * Tuteo neutro (focalizahr-narrativas). Copy PROVISIONAL — pasa por Studio IA.
+ */
+export const TAB2_ATACAR_SCREEN = {
+  titleWhite: 'Atacar la',
+  titleGradient: 'causa',
+  intro:
+    'El plan aprobado para este departamento y lo que su responsable reportó. Solo lectura.',
+  cancel: 'Volver',
+  stepsLabel: 'Pasos acordados',
+  notesLabel: 'Nota de RRHH',
+  historyLabel: 'Lo que se ha hecho',
+  seeAll: (n: number) => `Ver todas (${n})`,
+  loadingMore: 'Cargando…',
+  loading: 'Cargando el plan…',
+  error: {
+    title: 'No se pudo cargar el plan',
+    description: 'Vuelve a intentarlo en un momento.',
+    retry: 'Reintentar',
+  },
+  empty: {
+    title: 'Sin focos aprobados para este equipo',
+    description: 'Cuando se apruebe un plan para este departamento, aparecerá aquí.',
+  },
 } as const;
 
 /** Elección Meta / PDI (Estado A) — dos caminos con contexto, no dos botones sueltos. */

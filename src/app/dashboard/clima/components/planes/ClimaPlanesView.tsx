@@ -47,7 +47,8 @@ export default function ClimaPlanesView({ campaignId, onBack }: ClimaPlanesViewP
   // Tab 2: su Workspace también trae su propio contenedor (split) → mismo modo bare.
   const bare =
     (tab === 'departamento' && deptView !== 'carrusel') ||
-    (tab === 'persona' && (personaView === 'workspace' || personaView === 'fixmeta'));
+    (tab === 'persona' &&
+      (personaView === 'workspace' || personaView === 'fixmeta' || personaView === 'atacarcausa'));
 
   return (
     <div

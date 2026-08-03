@@ -37,13 +37,14 @@ import ClimaPersonaWorkspace, {
   type Tab2Action,
 } from './ClimaPersonaWorkspace';
 import ClimaFixMetaScreen from './ClimaFixMetaScreen';
+import ClimaAtacarCausaScreen from './ClimaAtacarCausaScreen';
 
 interface ByPersonData {
   responsables: ResponsableGroup[];
   stats: { responsablesConHallazgos: number; conCtaHabilitado: number; gateadosSinEmployee: number };
 }
 
-export type ClimaPlanPersonaView = 'portada' | 'carrusel' | 'workspace' | 'fixmeta';
+export type ClimaPlanPersonaView = 'portada' | 'carrusel' | 'workspace' | 'fixmeta' | 'atacarcausa';
 
 interface Props {
   campaignId: string | null;
@@ -72,13 +73,17 @@ export default function ClimaPlanPersonaTab({ campaignId, onViewChange }: Props)
   // refresca by-person tras crear metas.
   const [approvedPlanId, setApprovedPlanId] = useState<string | null>(null);
   const [metaCtx, setMetaCtx] = useState<{ departmentId: string } | null>(null);
+  const [pdiCtx, setPdiCtx] = useState<{ departmentId: string } | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
   const handleAction: Tab2Action = (departmentId, _route, kind) => {
-    // pdi queda gated (Blocker 2, sin pantalla destino) → nunca llega acá con 'pdi'.
     if (kind === 'meta' && approvedPlanId) {
       setMetaCtx({ departmentId });
       setView('fixmeta');
+    } else if (kind === 'pdi' && approvedPlanId) {
+      // "Atacar la causa" (V2): abre la vista del responsable sobre el plan aprobado.
+      setPdiCtx({ departmentId });
+      setView('atacarcausa');
     }
   };
 
@@ -184,6 +189,25 @@ export default function ClimaPlanPersonaTab({ campaignId, onViewChange }: Props)
     );
   }
 
+  // ── Pantalla "Atacar la causa" (bare: trae su propio contenedor) — V2 ──
+  if (view === 'atacarcausa' && pdiCtx && approvedPlanId) {
+    // Nombre del depto y del responsable para el header protagonista (RRHH debe saber
+    // de quién es el plan). `selected` es el grupo abierto (selectedKey sigue seteado).
+    const pdiDept = selected?.departamentos.find((d) => d.departmentId === pdiCtx.departmentId);
+    return (
+      <ClimaAtacarCausaScreen
+        planId={approvedPlanId}
+        departmentId={pdiCtx.departmentId}
+        departmentName={pdiDept?.departmentName ?? ''}
+        responsableName={selected?.name ?? ''}
+        onClose={() => {
+          setPdiCtx(null);
+          setView('workspace');
+        }}
+      />
+    );
+  }
+
   // ── Workspace (bare: trae su propio contenedor) ──
   if (view === 'workspace' && selected) {
     return (
@@ -191,9 +215,9 @@ export default function ClimaPlanPersonaTab({ campaignId, onViewChange }: Props)
         group={selected}
         onAction={handleAction}
         metaEnabled={!!approvedPlanId}
-        pdiEnabled={false}
+        pdiEnabled={!!approvedPlanId}
         metaGateReason={approvedPlanId ? undefined : TAB2_META_GATE.needsApprovedPlan}
-        pdiGateReason={TAB2_PDI_GATE.noScreen}
+        pdiGateReason={approvedPlanId ? undefined : TAB2_PDI_GATE.needsApprovedPlan}
         onBack={() => {
           setSelectedKey(null);
           setView('carrusel');
