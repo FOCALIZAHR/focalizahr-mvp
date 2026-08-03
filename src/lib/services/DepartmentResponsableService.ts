@@ -183,6 +183,89 @@ export async function resolveResponsableChain(params: {
   return { resolved, chainEmployeeIds };
 }
 
+/** Cadena ascendente de UN departamento, en la forma que necesita el consumidor bulk. */
+export interface ResponsableChain {
+  /** Primer responsable activo subiendo (= el "responsable directo" de cara al usuario). */
+  resolvedEmployeeId: string | null;
+  /** Él más todos los superiores ascendentes. Vacío = nadie responde por este depto. */
+  chainEmployeeIds: Set<string>;
+}
+
+/**
+ * Versión BULK de resolveResponsableChain: resuelve la cadena ascendente de N
+ * departamentos con **2 queries**, en vez de una tanda de walk-ups por departamento.
+ *
+ * ⚠️ MISMA REGLA que resolveResponsableChain, implementada dos veces — igual que el par
+ * getResponsableChainDepartmentIds / computeResponsableCandidateCounts, y por el mismo
+ * motivo: los costos son opuestos. Aquella resuelve UNO y paga queries por salto; ésta
+ * resuelve los N departamentos de una pantalla, donde eso serían decenas de round-trips.
+ * Si cambia la regla del walk-up, cambiarla en LAS DOS.
+ *
+ * Sin fallback a account_admin: al caller bulk (la Bitácora) no le sirve el admin de la
+ * cuenta, le sirve saber si el viewer responde o no por cada departamento. Un depto sin
+ * nadie activo en su cadena devuelve el set VACÍO — fail-closed, no escribe nadie.
+ *
+ * Multi-tenant: los departamentos se cargan filtrados por accountId, así que un parentId
+ * que apunte fuera de la cuenta corta la cadena (no está en el mapa).
+ */
+export async function computeResponsableChains(params: {
+  accountId: string;
+  departmentIds: string[];
+}): Promise<Map<string, ResponsableChain>> {
+  const { accountId, departmentIds } = params;
+  const out = new Map<string, ResponsableChain>();
+  if (departmentIds.length === 0) return out;
+
+  const departments = await prisma.department.findMany({
+    where: { accountId },
+    select: { id: true, parentId: true, responsableId: true },
+  });
+
+  // Solo los responsables que son Employee ACTIVO de la cuenta cuentan — mismo criterio
+  // que el walk-up unitario (`:57-60`), que salta al padre si el responsable está inactivo.
+  const responsableIds = departments
+    .map((d) => d.responsableId)
+    .filter((id): id is string => !!id);
+  const activos = responsableIds.length
+    ? await prisma.employee.findMany({
+        where: { id: { in: responsableIds }, accountId, isActive: true },
+        select: { id: true },
+      })
+    : [];
+  const activoIds = new Set(activos.map((e) => e.id));
+
+  const byId = new Map(departments.map((d) => [d.id, d]));
+
+  for (const departmentId of departmentIds) {
+    const chainEmployeeIds = new Set<string>();
+    let resolvedEmployeeId: string | null = null;
+
+    let currentId: string | null = departmentId;
+    let depth = 0;
+    const visitados = new Set<string>(); // corta ciclos de parentId
+
+    while (currentId && depth < MAX_DEPTH) {
+      if (visitados.has(currentId)) break;
+      visitados.add(currentId);
+
+      const dept = byId.get(currentId);
+      if (!dept) break; // ajeno a la cuenta o inexistente → corta la cadena acá
+
+      if (dept.responsableId && activoIds.has(dept.responsableId)) {
+        chainEmployeeIds.add(dept.responsableId);
+        if (!resolvedEmployeeId) resolvedEmployeeId = dept.responsableId;
+      }
+
+      currentId = dept.parentId;
+      depth += 1;
+    }
+
+    out.set(departmentId, { resolvedEmployeeId, chainEmployeeIds });
+  }
+
+  return out;
+}
+
 /**
  * Ids de departamento cuyos empleados pueden ser RESPONSABLES de `departmentId`:
  * el propio departamento + sus ancestros hasta la raíz + todos sus descendientes.

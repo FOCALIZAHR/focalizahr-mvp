@@ -26,13 +26,18 @@ import {
   getChildDepartmentIds,
   GLOBAL_ACCESS_ROLES,
 } from '@/lib/services/AuthorizationService';
-import { resolveResponsableChain } from '@/lib/services/DepartmentResponsableService';
+import {
+  resolveResponsableChain,
+  computeResponsableChains,
+} from '@/lib/services/DepartmentResponsableService';
+import { formatDisplayName } from '@/lib/utils/formatName';
 import type { ClimaDecisionItem } from '@/types/clima-planes';
 import type {
   ClimaAtacarCausaDecisionDTO,
   ClimaAtacarCausaEntryDTO,
   ClimaAtacarCausaLogDTO,
 } from '@/types/clima-atacar-causa';
+import type { ClimaBitacoraItemDTO } from '@/types/clima-bitacora';
 import { z } from 'zod';
 
 const TEXT_MAX = 200;
@@ -123,6 +128,186 @@ const BodySchema = z.object({
 });
 
 // ════════════════════════════════════════════════════════════════════════════
+// Modo `mine` — Bitácora de Acciones de Clima (F2). PERSONA-céntrico.
+//
+// Responde "¿qué hallazgos me tocan a mí?", que los otros dos modos no pueden: ellos
+// piden planId+departmentId porque RRHH ya eligió antes de entrar. Acá el usuario ES el
+// responsable, puede cubrir N departamentos (incluso fuera de su subárbol del JWT, por
+// walk-up) y no conoce el planId.
+//
+// Todo se resuelve en el servidor. El cliente no elige nada ni filtra nada.
+// ════════════════════════════════════════════════════════════════════════════
+async function getMine(
+  userContext: ReturnType<typeof extractUserContext>,
+  searchParams: URLSearchParams
+): Promise<NextResponse> {
+  const campaignId = searchParams.get('campaignId');
+  if (!campaignId) {
+    return NextResponse.json({ success: false, error: 'campaignId requerido' }, { status: 400 });
+  }
+  // `count=1`: solo el contador, para la card del Rail. Vive como parámetro y no como
+  // endpoint aparte para que la regla de cadena tenga UN solo lugar donde vivir.
+  const countOnly = searchParams.get('count') === '1';
+  const emptyData = countOnly ? { pendingCount: 0 } : { items: [], pendingCount: 0 };
+
+  // Sin vínculo Employee↔User no hay identidad que comparar contra la cadena. Vacío y
+  // 200, no 403: no es que le falte permiso, es que no le toca nada (y la card no aparece).
+  if (!userContext.employeeId) {
+    return NextResponse.json({ success: true, data: emptyData });
+  }
+  const viewerEmployeeId = userContext.employeeId;
+
+  const plan = await prisma.actionPlan.findFirst({
+    where: {
+      accountId: userContext.accountId,
+      campaignId,
+      moduleType: 'clima',
+      estado: 'aprobado',
+    },
+    select: { id: true, decisiones: true },
+    orderBy: { updatedAt: 'desc' },
+  });
+  // Sin plan aprobado no hay hallazgos asignados: vacío legítimo, nunca error.
+  if (!plan) {
+    return NextResponse.json({ success: true, data: emptyData });
+  }
+
+  const logRows = await prisma.climaActionLog.findMany({
+    where: { accountId: userContext.accountId, actionPlanId: plan.id },
+    select: { id: true, triggerRef: true, departmentId: true, actionText: true },
+  });
+  if (logRows.length === 0) {
+    return NextResponse.json({ success: true, data: emptyData });
+  }
+
+  // Cadenas de los departamentos con hallazgos: versión BULK (2 queries) en vez de un
+  // walk-up por departamento. Un jefe con 6 equipos serían 12 round-trips.
+  const chains = await computeResponsableChains({
+    accountId: userContext.accountId,
+    departmentIds: [...new Set(logRows.map((l) => l.departmentId))],
+  });
+
+  // EL filtro de esta vista: el viewer responde por ese departamento, directo o superior.
+  // Es más estricto que el filtrado jerárquico por rol — un HR_ADMIN que no es
+  // responsable de nada recibe [], que es la respuesta correcta a "mis hallazgos".
+  const myLogs = logRows.filter((l) => chains.get(l.departmentId)?.chainEmployeeIds.has(viewerEmployeeId));
+  if (myLogs.length === 0) {
+    return NextResponse.json({ success: true, data: emptyData });
+  }
+
+  // Decisiones indexadas por triggerRef, solo aceptar/modificar (misma regla que el modo
+  // lista). Un log sin decisión no se puede mostrar: no tendría narrativa ni pasos.
+  const decisionByRef = new Map<string, ClimaDecisionItem>();
+  for (const d of ((plan.decisiones as ClimaDecisionItem[] | null) ?? [])) {
+    if (d.ceoDecision === 'aceptar' || d.ceoDecision === 'modificar') {
+      decisionByRef.set(d.triggerRef, d);
+    }
+  }
+  const matched = myLogs.filter((l) => decisionByRef.has(l.triggerRef));
+
+  // pendingCount se cuenta sobre lo que la pantalla REALMENTE muestra: una card que
+  // promete N y una pantalla que trae N-1 es peor que no tener contador. D6: pendiente
+  // = actionText null, el mismo campo que lee ActionEffectivenessService.
+  const pendingCount = matched.filter((l) => l.actionText === null).length;
+
+  if (countOnly) {
+    return NextResponse.json({ success: true, data: { pendingCount } });
+  }
+  if (matched.length === 0) {
+    return NextResponse.json({ success: true, data: emptyData });
+  }
+
+  const [depts, allEntries] = await Promise.all([
+    prisma.department.findMany({
+      where: { id: { in: [...new Set(matched.map((l) => l.departmentId))] }, accountId: userContext.accountId },
+      select: { id: true, displayName: true },
+    }),
+    prisma.climaActionLogEntry.findMany({
+      where: {
+        accountId: userContext.accountId,
+        climaActionLogId: { in: matched.map((l) => l.id) },
+      },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, text: true, createdAt: true, createdBy: true, climaActionLogId: true },
+    }),
+  ]);
+  const deptNameById = new Map(depts.map((d) => [d.id, d.displayName]));
+
+  // Autores: un query para todas las entradas. SIN filtro isActive a propósito — quien
+  // escribió y después se fue de la empresa igual firmó esa entrada; borrarle el nombre
+  // reescribiría la bitácora. formatDisplayName y position (jobTitle está vacío en la
+  // nómina real) se resuelven acá para que el DTO viaje ya legible.
+  const authorIds = [...new Set(allEntries.map((e) => e.createdBy).filter((id): id is string => !!id))];
+  const authors = authorIds.length
+    ? await prisma.employee.findMany({
+        where: { id: { in: authorIds }, accountId: userContext.accountId },
+        select: { id: true, fullName: true, position: true },
+      })
+    : [];
+  const authorById = new Map(authors.map((e) => [e.id, e]));
+
+  const deptOfLog = new Map(matched.map((l) => [l.id, l.departmentId]));
+  const entriesByLog = new Map<string, ClimaAtacarCausaEntryDTO[]>();
+  for (const e of allEntries) {
+    const emp = e.createdBy ? authorById.get(e.createdBy) : null;
+    const chain = chains.get(deptOfLog.get(e.climaActionLogId) ?? '');
+    const arr = entriesByLog.get(e.climaActionLogId) ?? [];
+    arr.push({
+      id: e.id,
+      text: e.text,
+      createdAt: e.createdAt.toISOString(),
+      // D5: derivado en LECTURA contra el responsable resuelto de HOY. Orientativo, no
+      // evidencia; si cambia el responsable, entradas viejas cambian de etiqueta.
+      author: emp
+        ? {
+            name: formatDisplayName(emp.fullName),
+            position: emp.position,
+            relation: e.createdBy === chain?.resolvedEmployeeId ? 'responsable' : 'superior',
+          }
+        : null,
+    });
+    entriesByLog.set(e.climaActionLogId, arr);
+  }
+
+  // Orden estable entre recargas: departamento → pendientes primero → dimensión.
+  const sorted = [...matched].sort((a, b) => {
+    const byDept = (deptNameById.get(a.departmentId) ?? '').localeCompare(
+      deptNameById.get(b.departmentId) ?? '',
+      'es'
+    );
+    if (byDept !== 0) return byDept;
+    const byPending = Number(b.actionText === null) - Number(a.actionText === null);
+    if (byPending !== 0) return byPending;
+    return (decisionByRef.get(a.triggerRef)!.category).localeCompare(
+      decisionByRef.get(b.triggerRef)!.category,
+      'es'
+    );
+  });
+
+  const items: ClimaBitacoraItemDTO[] = sorted.map((l) => {
+    const d = decisionByRef.get(l.triggerRef)!;
+    const grouped = entriesByLog.get(l.id) ?? [];
+    return {
+      logId: l.id,
+      triggerRef: l.triggerRef,
+      category: d.category,
+      departmentId: l.departmentId,
+      departmentName: deptNameById.get(l.departmentId) ?? 'Departamento',
+      narrative: d.intervention.narrative,
+      steps: d.intervention.steps,
+      ceoNotes: d.ceoNotes ?? null,
+      // true por construcción: `matched` ya está filtrado a la cadena del viewer, y la
+      // cadena es la MISMA condición que el guard del POST. No se decide en el cliente.
+      canWrite: true,
+      entriesCount: grouped.length,
+      entries: grouped.slice(0, ENTRIES_PREVIEW),
+    };
+  });
+
+  return NextResponse.json({ success: true, data: { items, pendingCount } });
+}
+
+// ════════════════════════════════════════════════════════════════════════════
 // GET — "Atacar la causa" (Tab 2). ÚNICA fuente de datos de la vista: plan aprobado
 // (acotado al depto, solo aceptar/modificar) + bitácora, unidos por triggerRef, todo
 // resuelto en el servidor. No depende de /api/action-plans (esos entregan la cuenta
@@ -130,6 +315,11 @@ const BodySchema = z.object({
 //
 //   Modo lista:    ?planId=<id>&departmentId=<id>
 //   Modo entradas: ?logId=<id>&limit=<n>&offset=<m>  ("Ver todas")
+//   Modo mine:     ?scope=mine&campaignId=<id>[&count=1]   ← Bitácora (F2)
+//
+// El modo `mine` es PERSONA-céntrico, los otros dos son PLAN-céntricos. Es un modo
+// nuevo y no un parche de los existentes porque la pregunta es otra: "qué hallazgos me
+// tocan a mí", que puede abarcar N departamentos y no conoce el planId de antemano.
 // ════════════════════════════════════════════════════════════════════════════
 export async function GET(request: NextRequest) {
   try {
@@ -145,6 +335,12 @@ export async function GET(request: NextRequest) {
     const logId = searchParams.get('logId');
     const planId = searchParams.get('planId');
     const departmentId = searchParams.get('departmentId');
+    const scope = searchParams.get('scope');
+
+    // ── Modo mine — Bitácora: los hallazgos del viewer, en todos sus departamentos ──
+    if (scope === 'mine') {
+      return await getMine(userContext, searchParams);
+    }
 
     // ── Modo entradas — paginación de "Ver todas" de un log ──
     if (logId) {
