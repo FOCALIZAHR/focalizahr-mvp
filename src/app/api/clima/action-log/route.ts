@@ -128,7 +128,8 @@ const BodySchema = z.object({
 });
 
 // ════════════════════════════════════════════════════════════════════════════
-// Modo `mine` — Bitácora de Acciones de Clima (F2). PERSONA-céntrico.
+// SECCIÓN — Modo `mine`: Bitácora de Acciones de Clima. PERSONA-céntrico.
+// Abarca todo lo que sigue hasta el handler GET.
 //
 // Responde "¿qué hallazgos me tocan a mí?", que los otros dos modos no pueden: ellos
 // piden planId+departmentId porque RRHH ya eligió antes de entrar. Acá el usuario ES el
@@ -208,7 +209,8 @@ async function getMineEntriesPage(
     departmentId: log.departmentId,
     accountId: userContext.accountId,
   });
-  if (!userContext.employeeId || !chainEmployeeIds.has(userContext.employeeId)) {
+  const viewerEmployeeId = resolveViewerEmployeeId(userContext);
+  if (!viewerEmployeeId || !chainEmployeeIds.has(viewerEmployeeId)) {
     return NextResponse.json({ success: false, error: 'Sin acceso a este hallazgo' }, { status: 403 });
   }
 
@@ -238,6 +240,51 @@ async function getMineEntriesPage(
   return NextResponse.json({ success: true, data: { entries, entriesCount } });
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// ⛔ PUNTO ÚNICO DONDE SE RESUELVE LA IDENTIDAD DEL VIEWER — leer antes de tocar.
+//
+// QUÉ FALTA
+// La Bitácora necesita saber QUÉ EMPLEADO es el usuario logueado, porque la
+// responsabilidad sobre un departamento vive en `Department.responsableId →
+// Employee` (hecho de RRHH), no en el login. Ese vínculo llega por
+// `x-employee-id`, que sale de `User.employeeId` (acuñado en
+// `api/auth/user/login/route.ts:141`, inyectado en `middleware.ts:215`).
+//
+// Hoy `User.employeeId` está en NULL para TODOS los usuarios de todas las cuentas:
+// la Etapa 3 del vínculo Employee↔User está bloqueada, y las Etapas 4
+// (aprovisionamiento automático) y 5 (backfill) no están diseñadas.
+//
+// POR QUÉ DEVUELVE VACÍO
+// Sin employeeId no hay identidad que comparar contra la cadena de responsables,
+// así que `getMine` devuelve `items: []`. La pantalla existe, el endpoint funciona
+// y está probado contra datos reales, pero no tiene a quién reconocer. Es vacío
+// legítimo con 200, no un 403: al usuario no le falta permiso, le falta vínculo.
+//
+// POR QUÉ NO HAY FALLBACK POR EMAIL
+// El patrón legacy de ~30 rutas (`pdi/route.ts:31-33`,
+// `evaluator/cycles/route.ts:21-22`) resuelve el Employee buscando por
+// `x-user-email`. ACÁ NO SE USA, y no por purismo: en la cuenta de producción
+// 199 de 219 empleados comparten el email `1uan@corre.cl`, de los cuales 44 están
+// activos. `findFirst({email, status:'ACTIVE'})` devuelve uno arbitrario de esos
+// 44 — medido: para el email del responsable de Comercial devuelve a OTRA persona.
+//
+// En una ruta de lectura eso muestra una lista equivocada. Acá alimentaría el
+// guard de escritura y el `createdBy` de la entrada: la bitácora quedaría firmada
+// por quien no escribió, y ese registro es con el que después se evalúa si la
+// intervención funcionó. Un dato aproximado sería tolerable; la persona
+// equivocada no.
+//
+// CÓMO SE DESBLOQUEA
+// Etapa 3 de `.claude/tasks/ARQUITECTURA_VINCULO_EMPLOYEE_USER_v1.md`. Cuando
+// `User.employeeId` esté poblado, esta función empieza a devolver un id y la
+// pantalla se enciende sola: no hay nada más que cambiar acá.
+// ════════════════════════════════════════════════════════════════════════════
+function resolveViewerEmployeeId(
+  userContext: ReturnType<typeof extractUserContext>
+): string | null {
+  return userContext.employeeId;
+}
+
 async function getMine(
   userContext: ReturnType<typeof extractUserContext>,
   searchParams: URLSearchParams
@@ -259,12 +306,13 @@ async function getMine(
   const countOnly = searchParams.get('count') === '1';
   const emptyData = countOnly ? { pendingCount: 0 } : { items: [], pendingCount: 0 };
 
-  // Sin vínculo Employee↔User no hay identidad que comparar contra la cadena. Vacío y
-  // 200, no 403: no es que le falte permiso, es que no le toca nada (y la card no aparece).
-  if (!userContext.employeeId) {
+  // Identidad del empleado: vínculo directo, y si no está poblado, fallback por email.
+  // Sin ninguno de los dos no hay identidad que comparar contra la cadena. Vacío y 200,
+  // no 403: no es que le falte permiso, es que no le toca nada (y la card no aparece).
+  const viewerEmployeeId = resolveViewerEmployeeId(userContext);
+  if (!viewerEmployeeId) {
     return NextResponse.json({ success: true, data: emptyData });
   }
-  const viewerEmployeeId = userContext.employeeId;
 
   const plan = await prisma.actionPlan.findFirst({
     where: {
@@ -600,9 +648,12 @@ export async function POST(request: NextRequest) {
         { status: 403 }
       );
     }
-    if (!userContext.employeeId) {
-      // Vínculo Employee↔User no poblado para este usuario (esperado hasta el
-      // backfill con la primera nómina real). Mensaje honesto, no error crudo.
+    // Identidad del empleado que escribe. Punto único: ver resolveViewerEmployeeId.
+    const viewerEmployeeId = resolveViewerEmployeeId(userContext);
+    if (!viewerEmployeeId) {
+      // Vínculo Employee↔User no poblado (Etapa 3 pendiente). Mensaje honesto, no
+      // error crudo, y nunca un lookup por email: acá se firma una entrada, y una
+      // firma aproximada es una firma falsa.
       return NextResponse.json(
         {
           success: false,
@@ -612,7 +663,7 @@ export async function POST(request: NextRequest) {
         { status: 403 }
       );
     }
-    if (!chainEmployeeIds.has(userContext.employeeId)) {
+    if (!chainEmployeeIds.has(viewerEmployeeId)) {
       return NextResponse.json(
         { success: false, error: 'No eres responsable de este departamento' },
         { status: 403 }
@@ -643,7 +694,10 @@ export async function POST(request: NextRequest) {
           accountId: userContext.accountId,
           climaActionLogId: log.id,
           text: trimmed,
-          createdBy: userContext.employeeId,
+          // El employeeId REAL de quien escribe, resuelto arriba. Nunca asumido, y
+          // nunca `userContext.employeeId` crudo: eso guardaría null cuando la
+          // identidad vino del fallback por email.
+          createdBy: viewerEmployeeId,
         },
       });
 
@@ -652,7 +706,7 @@ export async function POST(request: NextRequest) {
         data: {
           actionText: trimmed,
           registeredAt: now,
-          registeredBy: userContext.employeeId,
+          registeredBy: viewerEmployeeId,
         },
       });
 

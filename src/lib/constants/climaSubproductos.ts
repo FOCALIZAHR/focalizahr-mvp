@@ -35,8 +35,12 @@ export const CLIMA_SUBPRODUCTOS: ClimaSubproductoDef[] = [
   { id: 'planes', label: 'Planes de Acción', icon: ClipboardCheck },
   // 6ª card. Las otras cinco son de CONSULTA; ésta es la única donde se ESCRIBE:
   // el responsable de un departamento registra qué hizo con sus focos de clima.
-  // Es también la única gateada por contenido — aparece solo si el viewer tiene
-  // focos asignados (una card que lleva a una pantalla vacía es ruido).
+  //
+  // PENDIENTE (una línea, cuando exista el vínculo Employee↔User): gatear esta card
+  // por `pendingCount > 0` de GET /api/clima/action-log?scope=mine&count=1, para que
+  // no se le muestre a quien no tiene focos asignados. HOY se muestra SIEMPRE: sin el
+  // vínculo poblado el conteo da 0 para todos y la card no aparecería nunca, o sea que
+  // el gate escondería la pantalla en vez de filtrarla.
   { id: 'bitacora', label: 'Bitácora de Acciones', icon: NotebookPen },
 ];
 

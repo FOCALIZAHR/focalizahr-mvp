@@ -42,10 +42,19 @@ export const BITACORA_SCREEN = {
     retry: 'Reintentar',
   },
 
+  /**
+   * Estado vacío ÚNICO. Hoy cubre dos causas que el usuario no distingue ni le
+   * importan: el vínculo con la nómina sin poblar, o simplemente no tener focos.
+   *
+   * Dice la verdad sin jerga: nada de "employeeId", nada de nombres de proyectos
+   * internos, nada de "en construcción". La segunda frase existe para que el jefe
+   * no se quede pensando que hizo algo mal ni que el sistema está roto.
+   */
   empty: {
-    title: 'Sin focos asignados',
+    title: 'Los focos de tu equipo',
     description:
-      'Cuando se apruebe un plan de clima que involucre a tu equipo, sus focos aparecen aquí.',
+      'Esta vista reúne los focos de clima de tu equipo para que registres qué hiciste con cada uno.',
+    insight: 'Todavía no está disponible: falta conectar los usuarios con la nómina.',
   },
 } as const;
 

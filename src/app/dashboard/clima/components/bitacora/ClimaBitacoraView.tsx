@@ -271,10 +271,14 @@ export default function ClimaBitacoraView({ campaignId, onBack }: Props) {
     return shell(
       <>
         {header}
+        {/* Estado vacío honesto. Hoy es el camino REAL de todos los usuarios: sin el
+            vínculo con la nómina el servidor no tiene a quién reconocer y devuelve
+            lista vacía. Ver el bloque de resolveViewerEmployeeId en el endpoint. */}
         <FHREmptyState
-          type="clear"
+          type="pending"
           title={BITACORA_SCREEN.empty.title}
           description={BITACORA_SCREEN.empty.description}
+          insight={BITACORA_SCREEN.empty.insight}
         />
       </>
     );
