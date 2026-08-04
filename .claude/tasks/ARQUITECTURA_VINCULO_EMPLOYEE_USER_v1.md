@@ -167,6 +167,42 @@ cambiar ahí**. Queda además una línea pendiente, anotada en
 `src/lib/constants/climaSubproductos.ts`: gatear la card del Rail por `pendingCount > 0`
 (hoy daría 0 para todos y escondería la pantalla en vez de filtrarla).
 
+##### 🧪 Cómo verificar la Bitácora el día que se retome
+
+Dos smokes quedaron **a propósito** en `prisma/scripts/` (untracked, contra la regla
+habitual de borrarlos al sellar). Implementan el procedimiento de fixture que hace falta
+para probar esto y no es obvio de reconstruir:
+
+| Script | Qué cubre |
+|---|---|
+| `smoke-clima-actionlog-chain-guard.ts` | El guard ampliado: responsable directo 200, superior en la línea 200, fuera de la línea 403, sin `employeeId` 403 — **cada caso contra GET y contra POST** |
+| `smoke-clima-actionlog-mine.ts` | El modo `scope=mine`: filtro persona-céntrico, `category` en el DTO, contador, bordes, y la autoría con `relation` `'responsable'`/`'superior'` |
+
+Los dos corren en **dry-run por defecto** (imprimen el plan y no escriben) y solo
+escriben con `--commit`:
+
+```
+npx --no-install tsx prisma/scripts/smoke-clima-actionlog-chain-guard.ts
+npx --no-install tsx prisma/scripts/smoke-clima-actionlog-mine.ts --commit
+```
+
+**Por qué necesitan fixture:** en la cuenta solo 4 de 57 departamentos tienen
+responsable y **ninguna cadena tiene dos**, así que el caso "superior en la línea" no
+tiene datos reales. Los scripts setean temporalmente
+`Department.responsableId` de Gerencia Comercial (`cmfgedyfo000d2413t42n3vwr`, hoy NULL)
+a Maria Garcia (`cmkrlxw8i0003c6q5amursr0o`, que ya es responsable de Gerencia E2E en esa
+misma rama), y lo restauran en `finally`: valor previo leído al arrancar, update por id
+exacto + `accountId`, un solo departamento, relectura por id al terminar, y las entries
+borradas por id exacto con el espejo del padre restaurado.
+
+⚠️ Es **escritura a producción** (base única). Correr el dry-run primero y avisar a
+Victor antes del `--commit`: mientras el fixture está puesto, el walk-up resuelve a Maria
+Garcia como responsable de Comercial y Atención a Clientes, y eso cambia lo que muestran
+Tab 2 y `by-person` durante esos segundos.
+
+Los ids de la topología están al inicio de cada script, verificados 2026-08-03/04.
+Si la nómina real reemplaza esos datos, revalidar antes de correr.
+
 #### ⛔ El fallback por email NO es una salida — está medido
 
 Antes de esta etapa, la tentación obvia es resolver el Employee por
