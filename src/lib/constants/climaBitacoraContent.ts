@@ -32,10 +32,17 @@ export const BITACORA_SCREEN = {
   /** Salida al lobby de Clima. Nombra el destino, no la operación. */
   back: 'Volver a Clima',
 
-  // SIN kicker, SIN título, SIN bajada (decisión Victor 2026-08-04). La persona
-  // entra desde la card del Rail, que ya dice "Bitácora de Acciones": el título
-  // repetía lo que acababa de tocar y empujaba el campo fuera de la pantalla.
-  // Entra cada varios meses, por un recordatorio, y tiene un minuto para escribir.
+  /**
+   * Nombre de la pantalla. UNA línea discreta, no el título grande con bajada que se
+   * sacó: sin él la pantalla no decía en ninguna parte qué era, y quien entra por un
+   * correo cada varios meses necesita reconocer dónde está.
+   *
+   * Dice EXACTO lo mismo que la card del Rail por la que se entra. Un nombre distinto
+   * para la misma superficie obliga a reaprender la navegación.
+   *
+   * Sin bajada: qué hacer acá lo dice el campo, no un párrafo explicativo.
+   */
+  screenName: 'Bitácora de acciones',
 
   loading: 'Cargando tus focos',
 

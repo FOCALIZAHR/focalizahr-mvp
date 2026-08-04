@@ -165,7 +165,10 @@ export default function ClimaBitacoraView({ campaignId, onBack }: Props) {
       // Sin desborde no hay nada que correr: devolver la rueda a la página.
       if (el.scrollWidth <= el.clientWidth) return;
       e.preventDefault();
-      el.scrollLeft += e.deltaY;
+      // `behavior: 'auto'` PISA el `scroll-smooth` de la clase. Con smooth, cada
+      // evento de rueda arranca una animación nueva desde una posición que todavía
+      // se está moviendo, y los deltas sucesivos se anulan entre sí.
+      el.scrollBy({ left: e.deltaY, behavior: 'auto' });
     };
     el.addEventListener('wheel', onWheel, { passive: false });
     return () => el.removeEventListener('wheel', onWheel);
@@ -275,9 +278,13 @@ export default function ClimaBitacoraView({ campaignId, onBack }: Props) {
     </motion.div>
   );
 
-  // ── BLOQUE 1 — salida e identidad comparten renglón ──
+  // ── BLOQUE 1 — nombre de la pantalla + salida e identidad en el mismo renglón ──
   const barraSuperior = (
-    <div className="flex items-center justify-between gap-3 min-h-[36px]">
+    <>
+      <p className="text-[10px] uppercase tracking-widest text-slate-500 mb-2">
+        {BITACORA_SCREEN.screenName}
+      </p>
+      <div className="flex items-center justify-between gap-3 min-h-[36px]">
       <button
         onClick={onBack}
         className="flex items-center gap-1.5 text-slate-400 hover:text-white transition-colors text-xs font-light shrink-0"
@@ -292,7 +299,8 @@ export default function ClimaBitacoraView({ campaignId, onBack }: Props) {
           {viewer.position && <span className="text-slate-600"> · {viewer.position}</span>}
         </p>
       )}
-    </div>
+      </div>
+    </>
   );
 
   if (status === 'loading') {
@@ -368,7 +376,13 @@ export default function ClimaBitacoraView({ campaignId, onBack }: Props) {
           ref={pillsRef}
           className="flex-1 min-w-0 flex gap-2 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] scroll-smooth -mx-1 px-1 py-1"
           style={{
-            scrollSnapType: 'x mandatory',
+            // `proximity`, NO `mandatory`. Con mandatory el contenedor tiene que quedar
+            // siempre apoyado en un anclaje: la rueda corría unos 100px, la píldora mide
+            // más, el anclaje más cercano seguía siendo el de partida y el navegador
+            // volvía a anclar donde estaba. La barra se veía congelada en escritorio
+            // mientras táctil y arrastre funcionaban, porque ahí el anclaje lo resuelve
+            // el navegador junto con el gesto y no contra él.
+            scrollSnapType: 'x proximity',
             WebkitOverflowScrolling: 'touch',
             maskImage: 'linear-gradient(to right, #000 calc(100% - 28px), transparent)',
             WebkitMaskImage: 'linear-gradient(to right, #000 calc(100% - 28px), transparent)',
