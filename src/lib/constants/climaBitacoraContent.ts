@@ -48,15 +48,16 @@ export const BITACORA_SCREEN = {
    * Estado vacío ÚNICO. Hoy cubre dos causas que el usuario no distingue ni le
    * importan: el vínculo con la nómina sin poblar, o simplemente no tener focos.
    *
-   * Dice la verdad sin jerga: nada de "employeeId", nada de nombres de proyectos
-   * internos, nada de "en construcción". La segunda frase existe para que el jefe
-   * no se quede pensando que hizo algo mal ni que el sistema está roto.
+   * Dice UNA cosa. El header de arriba ya explicó qué es la pantalla (`intro`), así
+   * que repetirlo acá lo hacía decir lo mismo dos veces. Este bloque solo aporta el
+   * dato que el header no tiene: por qué está vacío.
+   *
+   * Sin jerga: nada de "employeeId", nada de nombres de proyectos internos. Y sin
+   * lenguaje de roadmap: no dice "en construcción", dice qué falta.
    */
   empty: {
-    title: 'Los focos de tu equipo',
-    description:
-      'Esta vista reúne los focos de clima de tu equipo para que registres qué hiciste con cada uno.',
-    insight: 'Todavía no está disponible: falta conectar los usuarios con la nómina.',
+    title: 'Todavía no está disponible',
+    description: 'Falta conectar los usuarios con la nómina para identificar de qué focos respondes.',
   },
 } as const;
 

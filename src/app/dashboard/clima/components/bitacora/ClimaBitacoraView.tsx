@@ -298,7 +298,6 @@ export default function ClimaBitacoraView({ campaignId, onBack }: Props) {
           type="pending"
           title={BITACORA_SCREEN.empty.title}
           description={BITACORA_SCREEN.empty.description}
-          insight={BITACORA_SCREEN.empty.insight}
         />
       </>
     );
