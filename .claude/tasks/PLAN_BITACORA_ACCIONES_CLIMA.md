@@ -412,7 +412,38 @@ pasa invocando el handler real. Nunca hubo una rama que devolviera items sin ide
 
 ---
 
-## REDISEÑO DE LAYOUT — ✅ 2026-08-04 (`e87075b`)
+## REDISEÑO 2 — UNA PANTALLA, SIN SCROLL — ✅ 2026-08-04 (`617997c`)
+
+Después de verla con el fixture puesto: ocupaba **tres pantallas de alto**, once bloques
+apilados y dos scrolls antes del campo. La persona entra cada varios meses por un
+recordatorio y tiene un minuto. Sacar y juntar, cero lógica nueva.
+
+**Cuatro bloques:** salida + identidad en un renglón · contador fijo + píldoras ·
+UNA caja con departamento, problema, pasos, nota, aviso, campo y botón · bitácora en
+un renglón que no reserva altura.
+
+**Se eliminan kicker, título y bajada.** Diverge de "Los 5 Elementos Obligatorios"
+(`.claude/rules/frontend-design.md`), que exige word-split de títulos. Se trajo como
+decisión antes de escribir: la regla apunta a pantallas de ENTRADA a módulo, y acá la
+card del Rail por la que se entra ya dice "Bitácora de Acciones".
+
+**Píldoras monolínea con el patrón canónico de la skill**
+(`references/page-patterns.md:107-131`, PATRÓN 2) en vez del carrusel de cards de
+`ClimaRail` que se había clonado por error. De paso se cerró un conflicto mal
+diagnosticado: "máximo 4 pills" es **4 visibles más scroll**, no un tope de cantidad.
+
+**Abreviatura de departamento con garantía anti-colisión** en
+`climaBitacoraContent.ts`: primera palabra significativa saltando preposiciones y
+prefijos genéricos, y si dos departamentos de la vista abrevian igual, ambos caen al
+nombre completo. El truncado CSS no servía: dos focos de "Atención a Clientes" decían
+los dos `ATENCIÓN A CLIENT…`.
+
+Verificado sobre nombres reales: `Atención a Clientes → ATENCIÓN`, `Gerencia General →
+GENERAL`, y `Comercial` + `Gerencia Comercial` juntos → los dos con nombre completo.
+
+---
+
+## REDISEÑO 1 — DE SPLIT A UNA COLUMNA — ✅ 2026-08-04 (`e87075b`)
 
 Victor entró a la pantalla y no entendió qué tenía que hacer. El split 60/40 dejaba el
 campo compitiendo con un historial casi siempre vacío. **Reordenamiento, no
