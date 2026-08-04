@@ -379,6 +379,34 @@ Entries con texto del smoke = 0
 
 ---
 
+## REDISEÑO DE LAYOUT — ✅ 2026-08-04 (`e87075b`)
+
+Victor entró a la pantalla y no entendió qué tenía que hacer. El split 60/40 dejaba el
+campo compitiendo con un historial casi siempre vacío. **Reordenamiento, no
+reconstrucción:** fetch, envío, borradores, toasts, paginación y estados sin tocar.
+
+Flujo vertical único: salida → título → quién sos → píldoras → el foco → **el campo** →
+bitácora colapsada. La bitácora pasa a colapsada en TODOS los breakpoints.
+
+**Píldoras de dos líneas** (departamento + dimensión). Con un jefe de varios equipos se
+veían dos "Autonomía" y dos "Liderazgo" indistinguibles hasta tocarlas: en una pantalla
+que firma lo que se escribe, eso es registrar sobre el foco equivocado. El departamento
+sale de arriba del plan, donde quedaba duplicado.
+
+**`viewer` nuevo en el DTO del modo mine.** Nombre y cargo resueltos en el servidor, sin
+etiqueta. Va en el server y no desde `x-user-name` porque lo que corresponde mostrar es
+la identidad que el guard usó para decidir, que es la que va a firmar.
+
+**Dos defectos confirmados, arreglados:** el campo se renderizaba sin mirar `canWrite`
+(el POST ya revalidaba, era solo UI); y la salida existía pero en `slate-600` sobre
+`slate-900/60` era ilegible, así que subió a `slate-400` con label. Esa segunda es una
+divergencia deliberada del token del módulo.
+
+Smoke 23/23 (3 asserts nuevos de `viewer`). Sin línea de "sin permiso de escritura":
+decisión de Victor, no se agrega texto para explicar un caso que no debería existir.
+
+---
+
 ## AS-BUILT F3 + F4 — ✅ 2026-08-04 · GATE CERRADO
 
 **Nuevos:** `src/lib/constants/climaBitacoraContent.ts` ·
