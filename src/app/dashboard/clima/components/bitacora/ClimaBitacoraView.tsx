@@ -390,10 +390,13 @@ export default function ClimaBitacoraView({ campaignId, onBack }: Props) {
   //    narrativa, un solo CTA. Sin identidad de persona, sin split (SKILL.md Gate 1). ──
   if (vista === 'portada') {
     const equipos = new Set(items.map((i) => i.departmentId)).size;
+    // SIN barraSuperior: la portada NO lleva identidad de persona ni salida
+    // (SKILL.md Gate 1: "mensaje corto más 1 CTA, sin identidad de persona"). El
+    // nombre, el "Volver a Clima" y el rótulo de pantalla son encabezado del
+    // carrusel y aparecen recién ahí. Desde la portada la salida es el Rail, que
+    // está fijo abajo: no hay que inventar una, ya se está dentro de Clima.
     return shell(
-      <>
-        {barraSuperior}
-        <div className="flex flex-col items-center text-center py-8 md:py-12 max-w-xl mx-auto">
+      <div className="flex flex-col items-center text-center py-8 md:py-12 max-w-xl mx-auto">
           {/* Número en blanco, NO cian: el cian es del CTA y no deben competir. */}
           <p className="text-[64px] md:text-[72px] font-extralight tabular-nums text-white leading-[0.9]">
             {items.length}
@@ -420,8 +423,7 @@ export default function ClimaBitacoraView({ campaignId, onBack }: Props) {
               {BITACORA_PORTADA.cta}
             </PrimaryButton>
           </div>
-        </div>
-      </>
+      </div>
     );
   }
 
@@ -516,6 +518,20 @@ export default function ClimaBitacoraView({ campaignId, onBack }: Props) {
             </button>
           ))}
         </div>
+
+        {/* Hermana DERECHA del contenedor que scrollea. Al mover las flechas fuera del
+            área de scroll se había perdido esta mitad: quedaba solo la izquierda, que en
+            la posición inicial no tiene recorrido, y al tocarla se apagaba sola. */}
+        <button
+          onClick={() => desplazarPildoras(1)}
+          aria-label="Focos siguientes"
+          className={cn(
+            'hidden md:flex shrink-0 w-7 h-7 items-center justify-center rounded-full bg-slate-800/90 border border-slate-700 hover:bg-slate-700 transition-colors',
+            !canRight && 'invisible pointer-events-none'
+          )}
+        >
+          <ChevronRight className="w-4 h-4 text-white" />
+        </button>
       </div>
 
       {/* ── BLOQUE 3 — UNA caja: contexto y acción juntos ── */}
