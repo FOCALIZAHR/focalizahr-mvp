@@ -36,7 +36,15 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, ChevronDown, Info, Loader2, AlertTriangle } from 'lucide-react';
+import {
+  ArrowLeft,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Info,
+  Loader2,
+  AlertTriangle,
+} from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -145,34 +153,51 @@ export default function ClimaBitacoraView({ campaignId, onBack }: Props) {
   const unSoloDepartamento = abreviaturas.size === 1;
 
   /**
-   * Rueda vertical sobre la barra de píldoras => scroll horizontal.
+   * Flechas del carrusel. Reemplazan al listener de rueda, que se intentó dos veces y
+   * nunca movió la barra en escritorio (táctil y arrastre sí funcionaban).
    *
-   * Va como listener NATIVO con `{ passive: false }` y no como `onWheel` de React:
-   * React registra `wheel` en la raíz como pasivo, y ahí `preventDefault()` no
-   * aplica. Sin él la página scrollea vertical al mismo tiempo que las píldoras se
-   * corren, que se siente roto. Solo traduce el gesto: no toca datos ni estado.
+   * Un clic no depende de interceptar un evento del navegador ni de pelear con
+   * `scroll-snap`: es lo que hace cualquier carrusel de escritorio, y resuelve el
+   * problema real, que era que con mouse había píldoras a las que no se podía llegar.
    *
+   * `canLeft`/`canRight` existen para ocultar la flecha del lado sin recorrido: una
+   * flecha que no hace nada es peor que no tenerla.
+   */
+  const [canLeft, setCanLeft] = useState(false);
+  const [canRight, setCanRight] = useState(false);
+
+  const medirDesborde = useCallback(() => {
+    const el = pillsRef.current;
+    if (!el) return;
+    const max = el.scrollWidth - el.clientWidth;
+    // Tolerancia de 1px: los anchos son fraccionarios y el extremo nunca da exacto.
+    setCanLeft(el.scrollLeft > 1);
+    setCanRight(el.scrollLeft < max - 1);
+  }, []);
+
+  /**
    * Depende de `status` e `items.length` porque la barra no existe en loading, en
-   * error ni en el estado vacío: si el efecto corriera una sola vez al montar, el
-   * ref estaría en null y nunca se engancharía.
+   * error ni en el estado vacío: corriendo una sola vez al montar, el ref estaría en
+   * null y nunca se engancharía.
    */
   useEffect(() => {
     const el = pillsRef.current;
     if (!el) return;
-    const onWheel = (e: WheelEvent) => {
-      // Gesto ya horizontal (trackpad, shift+rueda): el navegador lo resuelve mejor.
-      if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
-      // Sin desborde no hay nada que correr: devolver la rueda a la página.
-      if (el.scrollWidth <= el.clientWidth) return;
-      e.preventDefault();
-      // `behavior: 'auto'` PISA el `scroll-smooth` de la clase. Con smooth, cada
-      // evento de rueda arranca una animación nueva desde una posición que todavía
-      // se está moviendo, y los deltas sucesivos se anulan entre sí.
-      el.scrollBy({ left: e.deltaY, behavior: 'auto' });
+    medirDesborde();
+    el.addEventListener('scroll', medirDesborde, { passive: true });
+    window.addEventListener('resize', medirDesborde);
+    return () => {
+      el.removeEventListener('scroll', medirDesborde);
+      window.removeEventListener('resize', medirDesborde);
     };
-    el.addEventListener('wheel', onWheel, { passive: false });
-    return () => el.removeEventListener('wheel', onWheel);
-  }, [status, items.length]);
+  }, [medirDesborde, status, items.length]);
+
+  /** Corre ~80% del ancho visible: deja una píldora de contexto entre salto y salto. */
+  const desplazarPildoras = useCallback((direccion: 1 | -1) => {
+    const el = pillsRef.current;
+    if (!el) return;
+    el.scrollBy({ left: direccion * Math.max(el.clientWidth * 0.8, 120), behavior: 'smooth' });
+  }, []);
 
   /** Aviso preventivo: alguien registró recién y no fui yo. Solo el hecho, sin instrucción. */
   const avisoReciente = useMemo(() => {
@@ -371,23 +396,45 @@ export default function ClimaBitacoraView({ campaignId, onBack }: Props) {
             El degradado del borde derecho es la señal de que la lista sigue. Va inline
             porque Tailwind no trae utilidad de máscara y no es color: es un recorte de
             opacidad. Queda fijo aunque se llegue al final (apagarlo pide un listener de
-            scroll; decisión de Victor 2026-08-04: no vale el estado). */}
-        <div
-          ref={pillsRef}
-          className="flex-1 min-w-0 flex gap-2 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] scroll-smooth -mx-1 px-1 py-1"
-          style={{
-            // `proximity`, NO `mandatory`. Con mandatory el contenedor tiene que quedar
-            // siempre apoyado en un anclaje: la rueda corría unos 100px, la píldora mide
-            // más, el anclaje más cercano seguía siendo el de partida y el navegador
-            // volvía a anclar donde estaba. La barra se veía congelada en escritorio
-            // mientras táctil y arrastre funcionaban, porque ahí el anclaje lo resuelve
-            // el navegador junto con el gesto y no contra él.
-            scrollSnapType: 'x proximity',
-            WebkitOverflowScrolling: 'touch',
-            maskImage: 'linear-gradient(to right, #000 calc(100% - 28px), transparent)',
-            WebkitMaskImage: 'linear-gradient(to right, #000 calc(100% - 28px), transparent)',
-          }}
-        >
+            scroll; decisión de Victor 2026-08-04: no vale el estado).
+
+            El `min-w-0` se mudó a este wrapper: las flechas van absolutas sobre la barra
+            y necesitan un ancestro `relative` que no sea el contenedor que scrollea. */}
+        <div className="relative flex-1 min-w-0">
+          {/* Flechas: patrón del módulo (ClimaRail.tsx:125-131), más chicas porque acá la
+              barra mide 44px y no 100+. Dos diferencias deliberadas con ese patrón:
+              no se revelan en hover (esconder la única forma de llegar a las píldoras
+              detrás de un hover recrea el problema que vinieron a resolver), y se ocultan
+              del lado sin recorrido. Solo en escritorio: en táctil el arrastre funciona y
+              acá taparían píldoras en 320px. */}
+          {canLeft && (
+            <button
+              onClick={() => desplazarPildoras(-1)}
+              aria-label="Focos anteriores"
+              className="hidden md:flex absolute left-0 top-1/2 -translate-y-1/2 z-10 w-7 h-7 items-center justify-center rounded-full bg-slate-800/90 border border-slate-700 hover:bg-slate-700 transition-colors shadow-lg"
+            >
+              <ChevronLeft className="w-4 h-4 text-white" />
+            </button>
+          )}
+          {canRight && (
+            <button
+              onClick={() => desplazarPildoras(1)}
+              aria-label="Focos siguientes"
+              className="hidden md:flex absolute right-0 top-1/2 -translate-y-1/2 z-10 w-7 h-7 items-center justify-center rounded-full bg-slate-800/90 border border-slate-700 hover:bg-slate-700 transition-colors shadow-lg"
+            >
+              <ChevronRight className="w-4 h-4 text-white" />
+            </button>
+          )}
+          <div
+            ref={pillsRef}
+            className="flex gap-2 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] scroll-smooth -mx-1 px-1 py-1"
+            style={{
+              scrollSnapType: 'x proximity',
+              WebkitOverflowScrolling: 'touch',
+              maskImage: 'linear-gradient(to right, #000 calc(100% - 28px), transparent)',
+              WebkitMaskImage: 'linear-gradient(to right, #000 calc(100% - 28px), transparent)',
+            }}
+          >
           {items.map((it, i) => (
             <button
               key={it.logId}
@@ -409,6 +456,7 @@ export default function ClimaBitacoraView({ campaignId, onBack }: Props) {
               )}
             </button>
           ))}
+          </div>
         </div>
       </div>
 
