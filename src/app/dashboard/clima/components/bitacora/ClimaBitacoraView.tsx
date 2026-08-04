@@ -12,18 +12,26 @@
 // NO es Tab 2. Tab 2 ("Atacar la causa") es la vista de consulta de RRHH y es
 // read-only. Esta pantalla no comparte código, tipos ni carpeta con ella.
 //
-// ── LAYOUT: CUATRO BLOQUES, SIN SCROLL (rediseño 2026-08-04) ───────────────
-// Antes ocupaba tres pantallas de alto: once bloques apilados antes del campo,
-// dos scrolls para llegar a lo único que la persona vino a hacer. Ahora:
+// ── DOS ESTADOS, MISMO CONTENEDOR ─────────────────────────────────────────
 //
-//   1. salida + identidad, mismo renglón          36px
+// PORTADA (primer estado): título word-split, número hero en BLANCO como respaldo
+// del título, dos frases y UN CTA. Sin identidad de persona, sin salida propia
+// (SKILL.md Gate 1). Molde CompensationPortada, NO el PATRÓN 5 de
+// page-patterns.md:211-270, que trae caja de misión, gauge y grilla.
+//
+// FOCOS (segundo estado): cuatro bloques, sin scroll. Antes ocupaba tres pantallas
+// de alto, once bloques apilados y dos scrolls para llegar a lo único que la
+// persona vino a hacer.
+//
+//   1. rótulo + salida + identidad                36px
 //   2. contador fijo + píldoras monolínea         44px
 //   3. UNA caja: depto, problema, pasos, CAMPO   ~380px
 //   4. bitácora: un renglón que se abre, o una línea si no hay registros
 //
-// Se eliminaron kicker, título y bajada: la persona entra desde la card del Rail
-// que ya dice "Bitácora de Acciones", así que repetían lo que acababa de tocar.
-// Entra cada varios meses, por un recordatorio, y tiene un minuto.
+// El rótulo de pantalla y el título de la portada dicen lo MISMO que la card del
+// Rail por la que se entra. Un nombre distinto para la misma superficie obliga a
+// reaprender la navegación. La persona entra cada varios meses, por un
+// recordatorio, y tiene un minuto.
 //
 // Píldoras: patrón canónico de la skill (focalizahr-design →
 // references/page-patterns.md:107-131, PATRÓN 2), NO el carrusel de cards de
@@ -397,17 +405,24 @@ export default function ClimaBitacoraView({ campaignId, onBack }: Props) {
     // está fijo abajo: no hay que inventar una, ya se está dentro de Clima.
     return shell(
       <div className="flex flex-col items-center text-center py-8 md:py-12 max-w-xl mx-auto">
+          {/* Título ARRIBA, número debajo como respaldo. Es el orden del molde: primero
+              qué pantalla es, después el dato que la sostiene. Sin kicker: con el título
+              puesto repetía lo mismo y gastaba altura. */}
+          <h2 className="text-3xl md:text-4xl font-extralight text-white tracking-tight leading-tight">
+            {BITACORA_PORTADA.titleWhite}
+          </h2>
+          <h3 className="text-2xl md:text-3xl font-light tracking-tight leading-tight fhr-title-gradient">
+            {BITACORA_PORTADA.titleGradient}
+          </h3>
+
           {/* Número en blanco, NO cian: el cian es del CTA y no deben competir. */}
-          <p className="text-[64px] md:text-[72px] font-extralight tabular-nums text-white leading-[0.9]">
+          <p className="text-[56px] md:text-[64px] font-extralight tabular-nums text-white leading-[0.9] mt-6">
             {items.length}
           </p>
           <p className="text-sm font-light text-slate-500 mt-1">
             {bitacoraPortadaSuffix(items.length, equipos)}
           </p>
-          <p className="text-[10px] uppercase tracking-widest text-slate-500 mt-5">
-            {BITACORA_PORTADA.kicker}
-          </p>
-          <p className="text-base font-light text-slate-300 leading-relaxed mt-5">
+          <p className="text-base font-light text-slate-300 leading-relaxed mt-6">
             {BITACORA_PORTADA.narrative}
           </p>
           <p className="text-sm font-light text-slate-500 leading-relaxed mt-4">
@@ -500,15 +515,21 @@ export default function ClimaBitacoraView({ campaignId, onBack }: Props) {
                  DOS DIVERGENCIAS deliberadas sobre ese patrón:
                  1. Glow en la activa. La skill no define glow para pills (solo para
                     Tesla line y botones, premium-components.md). Dentro de paleta.
-                 2. Hover más marcado. La skill llega a `hover:border-slate-600`; las
-                    inactivas se leían como etiquetas deshabilitadas y no daban señal de
-                    ser clicables. Sube el texto a slate-300 y el hover enciende borde
-                    cian tenue, texto blanco y fondo más claro. */
+                 2. Hover marcado. La skill llega a `hover:border-slate-600`, que sobre
+                    fondo oscuro no se percibe: las inactivas se leían como etiquetas
+                    deshabilitadas.
+
+                 Los valores están CALIBRADOS para que el salto se vea. Un intento previo
+                 usó `bg-slate-800/60 → bg-slate-800`, `border-cyan-500/30` y
+                 `text-slate-300 → white`: técnicamente aplicado, visualmente
+                 imperceptible. El fondo cambia de familia (800 → 700), el borde va a
+                 cyan-400/60 en vez de cyan-500/30, y `transition-all` en lugar de
+                 `transition-colors` para que el glow acompañe. */
               className={cn(
-                'shrink-0 px-3 py-1.5 rounded-lg text-[12px] font-light whitespace-nowrap transition-colors border',
+                'shrink-0 px-3 py-1.5 rounded-lg text-[12px] font-light whitespace-nowrap transition-all border',
                 i === activeIdx
-                  ? 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30 shadow-[0_0_12px_rgba(34,211,238,0.15)]'
-                  : 'bg-slate-800/60 text-slate-300 border-slate-700 hover:border-cyan-500/30 hover:text-white hover:bg-slate-800'
+                  ? 'bg-cyan-500/20 text-cyan-300 border-cyan-400/60 shadow-[0_0_16px_rgba(34,211,238,0.3)]'
+                  : 'bg-slate-800/40 text-slate-300 border-slate-600 hover:bg-slate-700 hover:text-white hover:border-cyan-400/60 hover:shadow-[0_0_10px_rgba(34,211,238,0.15)]'
               )}
             >
               {bitacoraPill(

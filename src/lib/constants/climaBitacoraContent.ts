@@ -84,8 +84,18 @@ export const BITACORA_SCREEN = {
  * de que lea nada.
  */
 export const BITACORA_PORTADA = {
-  kicker: 'Planes de Clima vigentes',
-  /** Verbo que nombra el resultado, no la operación. */
+  /**
+   * Título word-split del molde canónico: primera parte en blanco, segunda en
+   * gradiente. Va ARRIBA del número, que funciona como respaldo del título y no al
+   * revés.
+   *
+   * Texto idéntico al de la card del Rail por la que se entra. Un nombre distinto
+   * para la misma superficie obliga a reaprender la navegación.
+   */
+  titleWhite: 'Bitácora de',
+  titleGradient: 'Acciones',
+
+  /** Verbo que nombra el resultado, no la operación. Sin promesas de tiempo. */
   cta: 'Iniciar Bitácora de Acción',
   /** Vuelta a la portada desde el carrusel. */
   back: 'Ver el resumen',
