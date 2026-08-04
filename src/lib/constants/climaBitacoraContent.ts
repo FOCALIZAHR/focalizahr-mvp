@@ -31,10 +31,11 @@ export const BITACORA_RECENT_HOURS = 24;
 export const BITACORA_SCREEN = {
   /** Salida al lobby de Clima. Nombra el destino, no la operación. */
   back: 'Volver a Clima',
-  kicker: 'Clima · Tu equipo',
-  titleWhite: 'Bitácora de',
-  titleGradient: 'acciones',
-  intro: 'Los focos de clima de tu equipo. Registra lo que hiciste con cada uno.',
+
+  // SIN kicker, SIN título, SIN bajada (decisión Victor 2026-08-04). La persona
+  // entra desde la card del Rail, que ya dice "Bitácora de Acciones": el título
+  // repetía lo que acababa de tocar y empujaba el campo fuera de la pantalla.
+  // Entra cada varios meses, por un recordatorio, y tiene un minuto para escribir.
 
   loading: 'Cargando tus focos',
 
@@ -62,21 +63,19 @@ export const BITACORA_SCREEN = {
 } as const;
 
 export const BITACORA_PLAN = {
-  stepsLabel: 'Pasos acordados',
+  stepsLabel: 'Pasos acordados:',
   notesLabel: 'Nota de RRHH',
 } as const;
 
 export const BITACORA_FORM = {
   placeholder: '¿Qué hiciste con esto?',
-  submit: 'Registrar intervención en bitácora',
-  /** Variante corta para 320px: el CTA largo se trunca. Mismo significado. */
-  submitShort: 'Registrar en bitácora',
+  submit: 'Registrar intervención',
   submitting: 'Registrando',
 } as const;
 
 export const BITACORA_HISTORY = {
-  /** No repite el título de la pantalla: nombra el CONTENIDO de la columna. */
-  label: 'Lo que se registró',
+  /** Un renglón al final. Acota a ESTE foco: la bitácora es por hallazgo, no global. */
+  label: 'Bitácora de este foco',
   empty: 'Todavía no hay registros en este foco.',
   loadingMore: 'Cargando',
 } as const;
@@ -93,17 +92,63 @@ export function bitacoraCounter(index: number, total: number): string {
   return `${index + 1} de ${total}`;
 }
 
+// ── Abreviatura de departamento para las píldoras ───────────────────────────
+//
+// La píldora es MONOLÍNEA (`DEPTO · Dimensión`), así que el nombre completo no
+// entra. El truncado por CSS no sirve: con dos focos de "Atención a Clientes" las
+// dos decían "ATENCIÓN A CLIENT…" y no distinguían nada, que era justo lo que
+// estas píldoras vinieron a resolver.
+
+const PALABRAS_VACIAS = new Set(['de', 'del', 'la', 'las', 'los', 'el', 'a', 'al', 'y', 'e', 'o', 'u']);
+
+/** Prefijos que no identifican: "Gerencia Comercial" se reconoce por COMERCIAL. */
+const PREFIJOS_GENERICOS = new Set([
+  'gerencia', 'subgerencia', 'departamento', 'area', 'division', 'unidad', 'sub',
+]);
+
+const sinTildes = (s: string) =>
+  s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z]/g, '');
+
+function primeraPalabraSignificativa(nombre: string): string {
+  const palabras = nombre.trim().split(/\s+/).filter((w) => {
+    const l = sinTildes(w);
+    return l.length > 0 && !PALABRAS_VACIAS.has(l);
+  });
+  if (palabras.length === 0) return nombre.toUpperCase();
+  let i = 0;
+  // Salta prefijos genéricos mientras quede algo más específico detrás.
+  while (i < palabras.length - 1 && PREFIJOS_GENERICOS.has(sinTildes(palabras[i]))) i += 1;
+  return palabras[i].toUpperCase();
+}
+
 /**
- * Contador de registros de una píldora. La píldora es de DOS LÍNEAS y el
- * departamento va aparte, así que acá solo viaja el número.
+ * Abreviatura por departamento, GARANTIZANDO que dos departamentos distintos nunca
+ * queden con la misma etiqueta.
  *
- * Por qué dos líneas: un jefe puede responder por más de un departamento, y con la
- * píldora de una sola línea se veían dos "Autonomía" y dos "Liderazgo"
- * indistinguibles hasta tocarlas. En una pantalla donde se escribe un registro
- * atribuible, eso es poder registrar sobre el foco equivocado.
+ * Se calcula sobre los departamentos presentes en la vista, no sobre la cuenta
+ * entera: "Comercial" y "Gerencia Comercial" abrevian las dos a COMERCIAL, y si
+ * ambas están en pantalla, las dos caen al nombre completo. Dos píldoras idénticas
+ * apuntando a departamentos distintos es exactamente el error que hay que evitar en
+ * una pantalla que firma lo que se escribe.
  */
-export function bitacoraPillCount(registros: number): string {
-  return `· ${registros}`;
+export function bitacoraAbreviarDepartamentos(nombres: string[]): Map<string, string> {
+  const unicos = [...new Set(nombres)];
+  const porAbreviatura = new Map<string, number>();
+  for (const n of unicos) {
+    const a = primeraPalabraSignificativa(n);
+    porAbreviatura.set(a, (porAbreviatura.get(a) ?? 0) + 1);
+  }
+  const out = new Map<string, string>();
+  for (const n of unicos) {
+    const a = primeraPalabraSignificativa(n);
+    out.set(n, (porAbreviatura.get(a) ?? 0) > 1 ? n.toUpperCase() : a);
+  }
+  return out;
+}
+
+/** Etiqueta de la píldora: `COMERCIAL · Liderazgo`. */
+export function bitacoraPill(departamentoAbreviado: string, dimension: string): string {
+  return `${departamentoAbreviado} · ${dimension}`;
 }
 
 /** "Ver anteriores (5)" cuando hay más de las visibles. */
@@ -111,9 +156,9 @@ export function bitacoraSeeAll(total: number): string {
   return `Ver anteriores (${total})`;
 }
 
-/** Disclosure de la bitácora en mobile. */
+/** Cola del renglón de la bitácora: `Bitácora de este foco · sin registros`. */
 export function bitacoraDisclosure(total: number): string {
-  if (total === 0) return 'Sin registros';
+  if (total === 0) return 'sin registros';
   return total === 1 ? '1 registro' : `${total} registros`;
 }
 

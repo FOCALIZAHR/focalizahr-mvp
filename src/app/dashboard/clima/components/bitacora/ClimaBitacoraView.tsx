@@ -12,18 +12,23 @@
 // NO es Tab 2. Tab 2 ("Atacar la causa") es la vista de consulta de RRHH y es
 // read-only. Esta pantalla no comparte código, tipos ni carpeta con ella.
 //
-// ── LAYOUT: UNA COLUMNA (rediseño 2026-08-04) ──────────────────────────────
-// Antes era un split 60/40 que ponía el campo de escritura a competir con un
-// historial casi siempre vacío. Escribir es a lo que la persona vino, así que
-// ahora es un flujo vertical y el campo es el centro:
+// ── LAYOUT: CUATRO BLOQUES, SIN SCROLL (rediseño 2026-08-04) ───────────────
+// Antes ocupaba tres pantallas de alto: once bloques apilados antes del campo,
+// dos scrolls para llegar a lo único que la persona vino a hacer. Ahora:
 //
-//   salida → título → quién sos → píldoras → el foco → EL CAMPO → bitácora
+//   1. salida + identidad, mismo renglón          36px
+//   2. contador fijo + píldoras monolínea         44px
+//   3. UNA caja: depto, problema, pasos, CAMPO   ~380px
+//   4. bitácora, un renglón que se abre al tocar
 //
-// La bitácora va al final y COLAPSADA en todos los breakpoints: es respaldo, no
-// protagonista.
+// Se eliminaron kicker, título y bajada: la persona entra desde la card del Rail
+// que ya dice "Bitácora de Acciones", así que repetían lo que acababa de tocar.
+// Entra cada varios meses, por un recordatorio, y tiene un minuto.
 //
-// SIN color protagonista propio. Chrome canónico idéntico a las otras superficies
-// de clima; esta pantalla se distingue por estructura, no por color.
+// Píldoras: patrón canónico de la skill (focalizahr-design →
+// references/page-patterns.md:107-131, PATRÓN 2), NO el carrusel de cards de
+// ClimaRail que se había clonado por error. Monolínea, whitespace-nowrap, 4
+// visibles más scroll horizontal.
 //
 // ÚNICA fuente de datos: GET /api/clima/action-log?scope=mine. El servidor decide
 // qué focos le tocan y con qué identidad; el cliente no filtra ni elige nada.
@@ -48,7 +53,8 @@ import {
   BITACORA_TEXT_MAX,
   BITACORA_RECENT_HOURS,
   bitacoraCounter,
-  bitacoraPillCount,
+  bitacoraPill,
+  bitacoraAbreviarDepartamentos,
   bitacoraSeeAll,
   bitacoraDisclosure,
   bitacoraRecentNotice,
@@ -89,7 +95,6 @@ export default function ClimaBitacoraView({ campaignId, onBack }: Props) {
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
-  /** La bitácora arranca colapsada en TODOS los breakpoints: el foco es escribir. */
   const [historyOpen, setHistoryOpen] = useState(false);
 
   const load = useCallback(async () => {
@@ -124,6 +129,12 @@ export default function ClimaBitacoraView({ campaignId, onBack }: Props) {
   const trimmed = draft.trim();
   const puedeRegistrar =
     !!active && active.canWrite && trimmed.length > 0 && trimmed.length <= BITACORA_TEXT_MAX && !submitting;
+
+  /** Abreviaturas anti-colisión, calculadas sobre los departamentos de ESTA vista. */
+  const abreviaturas = useMemo(
+    () => bitacoraAbreviarDepartamentos(items.map((i) => i.departmentName)),
+    [items]
+  );
 
   /** Aviso preventivo: alguien registró recién y no fui yo. Solo el hecho, sin instrucción. */
   const avisoReciente = useMemo(() => {
@@ -206,8 +217,7 @@ export default function ClimaBitacoraView({ campaignId, onBack }: Props) {
     }
   }, [active]);
 
-  // ── Chrome canónico. Columna única y angosta: es una pantalla de lectura corta
-  //    más un campo, no un dashboard. ───────────────────────────────────────
+  // ── Chrome canónico. Padding contenido: la pantalla tiene que entrar sin scroll. ──
   const shell = (children: ReactNode) => (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
@@ -225,21 +235,29 @@ export default function ClimaBitacoraView({ campaignId, onBack }: Props) {
             opacity: 0.7,
           }}
         />
-        <div className="px-4 py-8 md:px-10 md:py-12">{children}</div>
+        <div className="px-4 py-5 md:px-6 md:py-6">{children}</div>
       </div>
     </motion.div>
   );
 
-  // Salida al lobby. El control ya existía pero en slate-600 sobre slate-900/60 era
-  // ilegible y se leía como "no hay forma de volver". Divergencia deliberada del
-  // token del módulo (ClimaPlanesView usa slate-600): acá la salida tiene que verse.
-  const salida = (
-    <button
-      onClick={onBack}
-      className="flex items-center gap-1.5 min-h-[44px] text-slate-400 hover:text-white transition-colors text-xs font-light"
-    >
-      <ArrowLeft className="w-4 h-4" /> {BITACORA_SCREEN.back}
-    </button>
+  // ── BLOQUE 1 — salida e identidad comparten renglón ──
+  const barraSuperior = (
+    <div className="flex items-center justify-between gap-3 min-h-[36px]">
+      <button
+        onClick={onBack}
+        className="flex items-center gap-1.5 text-slate-400 hover:text-white transition-colors text-xs font-light shrink-0"
+      >
+        <ArrowLeft className="w-4 h-4" /> {BITACORA_SCREEN.back}
+      </button>
+      {viewer && (
+        // Identidad resuelta EN EL SERVIDOR: es la que va a quedar firmando lo que
+        // escriba. Nombre y cargo en un renglón, sin etiqueta.
+        <p className="text-[11px] font-light text-slate-400 truncate text-right">
+          {viewer.name}
+          {viewer.position && <span className="text-slate-600"> · {viewer.position}</span>}
+        </p>
+      )}
+    </div>
   );
 
   if (status === 'loading') {
@@ -254,8 +272,8 @@ export default function ClimaBitacoraView({ campaignId, onBack }: Props) {
   if (status === 'error') {
     return shell(
       <>
-        {salida}
-        <div className="flex flex-col items-center justify-center gap-4 py-12 text-center">
+        {barraSuperior}
+        <div className="flex flex-col items-center justify-center gap-4 py-10 text-center">
           <AlertTriangle className="w-8 h-8 text-slate-500" strokeWidth={1.5} />
           <div>
             <h3 className="text-slate-200 font-light text-base">{BITACORA_SCREEN.error.title}</h3>
@@ -271,60 +289,34 @@ export default function ClimaBitacoraView({ campaignId, onBack }: Props) {
     );
   }
 
-  const header = (
-    <header className="mb-7">
-      {salida}
-      <p className="text-[10px] uppercase tracking-widest text-slate-500 mt-6 mb-2">
-        {BITACORA_SCREEN.kicker}
-      </p>
-      <h2 className="text-2xl md:text-3xl font-extralight text-white tracking-tight leading-tight">
-        {BITACORA_SCREEN.titleWhite}{' '}
-        <span className="fhr-title-gradient">{BITACORA_SCREEN.titleGradient}</span>
-      </h2>
-      <p className="text-sm md:text-base font-light text-slate-400 leading-relaxed mt-3">
-        {BITACORA_SCREEN.intro}
-      </p>
-    </header>
-  );
-
   if (items.length === 0 || !active) {
     return shell(
       <>
-        {header}
-        {/* Estado vacío honesto. Hoy es el camino REAL de todos los usuarios: sin el
-            vínculo con la nómina el servidor no tiene a quién reconocer y devuelve
+        {barraSuperior}
+        {/* Estado vacío honesto. Hoy es el camino REAL de casi todos los usuarios: sin
+            el vínculo con la nómina el servidor no tiene a quién reconocer y devuelve
             lista vacía. Ver el bloque de resolveViewerEmployeeId en el endpoint. */}
-        <FHREmptyState
-          type="pending"
-          title={BITACORA_SCREEN.empty.title}
-          description={BITACORA_SCREEN.empty.description}
-        />
+        <div className="mt-5">
+          <FHREmptyState
+            type="pending"
+            title={BITACORA_SCREEN.empty.title}
+            description={BITACORA_SCREEN.empty.description}
+          />
+        </div>
       </>
     );
   }
 
   return shell(
     <>
-      {header}
+      {barraSuperior}
 
-      {/* ── Quién está mirando. Identidad resuelta EN EL SERVIDOR: es la que va a
-          quedar firmando lo que escriba. Nombre y cargo, sin etiqueta. ── */}
-      {viewer && (
-        <div className="pb-5 mb-6 border-b border-slate-800/40">
-          <p className="text-sm font-light text-slate-200 leading-tight">{viewer.name}</p>
-          {viewer.position && (
-            <p className="text-[11px] font-light text-slate-500 leading-tight mt-0.5">
-              {viewer.position}
-            </p>
-          )}
-        </div>
-      )}
-
-      {/* ── Píldoras de DOS LÍNEAS: departamento arriba, dimensión abajo. El contador
-          "1 de N" queda FIJO fuera del scroll para que en 320px se sepa cuántos focos
-          hay sin recorrer la barra. Sin "+N": se ven todos. ── */}
-      <div className="flex items-start gap-3 mb-7">
-        <span className="shrink-0 mt-4 text-[10px] font-mono uppercase tracking-wider text-slate-500 tabular-nums">
+      {/* ── BLOQUE 2 — contador FIJO + píldoras monolínea ──
+          Patrón canónico de pills (page-patterns.md:107-131): whitespace-nowrap,
+          rounded-lg, scroll horizontal. El contador no scrollea, para saber cuántos
+          focos hay sin recorrer la barra. */}
+      <div className="flex items-center gap-3 mt-4 min-h-[44px]">
+        <span className="shrink-0 text-[10px] font-mono uppercase tracking-wider text-slate-500 tabular-nums">
           {bitacoraCounter(activeIdx, items.length)}
         </span>
         <div
@@ -340,115 +332,97 @@ export default function ClimaBitacoraView({ campaignId, onBack }: Props) {
               }}
               style={{ scrollSnapAlign: 'start' }}
               className={cn(
-                'shrink-0 w-[132px] min-h-[56px] px-3 py-2 rounded-xl border text-left transition-colors',
+                'shrink-0 px-3 py-1.5 rounded-lg text-[12px] font-light whitespace-nowrap transition-colors border',
                 i === activeIdx
-                  ? 'border-cyan-500/40 bg-cyan-500/10'
-                  : 'border-slate-700/40 hover:border-slate-600/60'
+                  ? 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30'
+                  : 'bg-slate-800/60 text-slate-400 border-slate-700 hover:border-slate-600'
               )}
             >
-              <span
-                className={cn(
-                  'block text-[9px] uppercase tracking-wider font-light truncate',
-                  i === activeIdx ? 'text-cyan-400/70' : 'text-slate-500'
-                )}
-              >
-                {it.departmentName}
-              </span>
-              <span className="flex items-baseline gap-1">
-                <span
-                  className={cn(
-                    'text-[12px] font-light truncate',
-                    i === activeIdx ? 'text-cyan-300' : 'text-slate-300'
-                  )}
-                >
-                  {dimensionLabel(it.category)}
-                </span>
-                <span className="text-[10px] font-light text-slate-500 tabular-nums shrink-0">
-                  {bitacoraPillCount(it.entriesCount)}
-                </span>
-              </span>
+              {bitacoraPill(
+                abreviaturas.get(it.departmentName) ?? it.departmentName,
+                dimensionLabel(it.category)
+              )}
             </button>
           ))}
         </div>
       </div>
 
-      {/* ── El foco. El departamento ya viaja en la píldora, así que no se repite. ── */}
-      <p className="text-[15px] md:text-base text-slate-200 font-light leading-[1.7]">
-        {active.narrative}
-      </p>
-
-      {active.steps.length > 0 && (
-        <div className="mt-5">
-          <p className="text-[10px] font-light uppercase tracking-wider text-slate-600 mb-2">
-            {BITACORA_PLAN.stepsLabel}
-          </p>
-          <ul className="space-y-1.5 pl-4">
-            {active.steps.map((s, i) => (
-              <li key={i} className="text-[12px] text-slate-500 font-light leading-relaxed list-disc">
-                {s}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {active.ceoNotes && (
-        <p className="text-[12px] font-light text-slate-400 mt-4 pl-3 border-l border-slate-700/40">
-          <span className="text-slate-500">{BITACORA_PLAN.notesLabel}: </span>
-          {active.ceoNotes}
+      {/* ── BLOQUE 3 — UNA caja: contexto y acción juntos ── */}
+      <div className="mt-4 rounded-xl border border-slate-800/60 bg-slate-950/30 p-4 md:p-5">
+        <p className="text-[10px] uppercase tracking-widest text-slate-500 mb-2">
+          {active.departmentName}
         </p>
-      )}
 
-      {avisoReciente && (
-        <div className="flex items-start gap-2 mt-5 rounded-lg border border-slate-700/30 bg-slate-800/20 px-3 py-2.5">
-          <Info className="w-3.5 h-3.5 text-slate-500 shrink-0 mt-0.5" strokeWidth={1.5} />
-          <p className="text-[12px] font-light text-slate-400 leading-relaxed">{avisoReciente}</p>
-        </div>
-      )}
+        <p className="text-[15px] text-slate-200 font-light leading-[1.6]">{active.narrative}</p>
 
-      {/* ── EL CENTRO DE LA PANTALLA ──
-          Gate por canWrite: el servidor decide quién escribe y el POST revalida por su
-          cuenta. Sin permiso no se pinta un campo que iba a devolver 403. */}
-      {active.canWrite && (
-        <div className="mt-7">
-          <textarea
-            value={draft}
-            onChange={(e) =>
-              setDrafts((p) => ({ ...p, [active.logId]: e.target.value.slice(0, BITACORA_TEXT_MAX) }))
-            }
-            disabled={submitting}
-            rows={4}
-            maxLength={BITACORA_TEXT_MAX}
-            placeholder={BITACORA_FORM.placeholder}
-            className="w-full rounded-xl border border-slate-700/50 bg-slate-900/60 px-3.5 py-3 text-[14px] font-light text-slate-200 placeholder:text-slate-600 leading-relaxed resize-none focus:outline-none focus:border-cyan-500/50 transition-colors disabled:opacity-50"
-          />
-          <div className="flex items-center justify-between gap-3 mt-2.5">
-            <span className="text-[10px] font-mono text-slate-600 tabular-nums shrink-0">
-              {draft.length}/{BITACORA_TEXT_MAX}
-            </span>
-            <PrimaryButton size="sm" onClick={onRegistrar} disabled={!puedeRegistrar}>
-              {submitting ? (
-                <span className="flex items-center gap-1.5">
-                  <Loader2 className="w-3 h-3 animate-spin" /> {BITACORA_FORM.submitting}
-                </span>
-              ) : (
-                <>
-                  <span className="md:hidden">{BITACORA_FORM.submitShort}</span>
-                  <span className="hidden md:inline">{BITACORA_FORM.submit}</span>
-                </>
-              )}
-            </PrimaryButton>
+        {active.steps.length > 0 && (
+          <div className="mt-3">
+            <p className="text-[11px] font-light text-slate-500 mb-1">{BITACORA_PLAN.stepsLabel}</p>
+            <ul className="space-y-1 pl-4">
+              {active.steps.map((s, i) => (
+                <li key={i} className="text-[12px] text-slate-500 font-light leading-relaxed list-disc">
+                  {s}
+                </li>
+              ))}
+            </ul>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* ── La bitácora, al final y colapsada. Respaldo, no protagonista. ── */}
-      <div className="mt-8 border-t border-slate-800/40 pt-4">
+        {active.ceoNotes && (
+          <p className="text-[12px] font-light text-slate-400 mt-3 pl-3 border-l border-slate-700/40">
+            <span className="text-slate-500">{BITACORA_PLAN.notesLabel}: </span>
+            {active.ceoNotes}
+          </p>
+        )}
+
+        {avisoReciente && (
+          <div className="flex items-start gap-2 mt-3 rounded-lg border border-slate-700/30 bg-slate-800/20 px-3 py-2">
+            <Info className="w-3.5 h-3.5 text-slate-500 shrink-0 mt-0.5" strokeWidth={1.5} />
+            <p className="text-[12px] font-light text-slate-400 leading-relaxed">{avisoReciente}</p>
+          </div>
+        )}
+
+        {/* El campo, dentro de la misma caja que el contexto que lo justifica.
+            Gate por canWrite: el POST revalida por su cuenta, así que sin permiso no
+            se pinta un campo que iba a devolver 403. */}
+        {active.canWrite && (
+          <div className="mt-4">
+            <textarea
+              value={draft}
+              onChange={(e) =>
+                setDrafts((p) => ({ ...p, [active.logId]: e.target.value.slice(0, BITACORA_TEXT_MAX) }))
+              }
+              disabled={submitting}
+              rows={3}
+              maxLength={BITACORA_TEXT_MAX}
+              placeholder={BITACORA_FORM.placeholder}
+              className="w-full rounded-lg border border-slate-700/50 bg-slate-900/60 px-3 py-2.5 text-[14px] font-light text-slate-200 placeholder:text-slate-600 leading-relaxed resize-none focus:outline-none focus:border-cyan-500/50 transition-colors disabled:opacity-50"
+            />
+            <div className="flex items-center justify-between gap-3 mt-2">
+              <span className="text-[10px] font-mono text-slate-600 tabular-nums shrink-0">
+                {draft.length}/{BITACORA_TEXT_MAX}
+              </span>
+              <PrimaryButton size="sm" onClick={onRegistrar} disabled={!puedeRegistrar}>
+                {submitting ? (
+                  <span className="flex items-center gap-1.5">
+                    <Loader2 className="w-3 h-3 animate-spin" /> {BITACORA_FORM.submitting}
+                  </span>
+                ) : (
+                  BITACORA_FORM.submit
+                )}
+              </PrimaryButton>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── BLOQUE 4 — un renglón. Colapsada NO reserva altura. ── */}
+      <div className="mt-3">
         <button
           onClick={() => setHistoryOpen((v) => !v)}
-          className="w-full min-h-[44px] flex items-center justify-between text-left"
+          className="w-full flex items-center justify-between gap-2 py-2 text-left group"
         >
-          <span className="text-[11px] font-light uppercase tracking-wider text-slate-500">
+          <span className="text-[11px] font-light text-slate-500 group-hover:text-slate-400 transition-colors">
             {BITACORA_HISTORY.label} · {bitacoraDisclosure(active.entriesCount)}
           </span>
           <ChevronDown
@@ -460,13 +434,13 @@ export default function ClimaBitacoraView({ campaignId, onBack }: Props) {
         </button>
 
         {historyOpen && (
-          <div className="mt-4">
+          <div className="mt-2 pb-1">
             {active.entries.length === 0 ? (
               <p className="text-[13px] font-light text-slate-500 leading-relaxed">
                 {BITACORA_HISTORY.empty}
               </p>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-3">
                 <AnimatePresence initial={false}>
                   {active.entries.map((e) => (
                     <motion.div
@@ -493,7 +467,7 @@ export default function ClimaBitacoraView({ campaignId, onBack }: Props) {
                           {e.author.position}
                         </p>
                       )}
-                      <p className="text-[13px] font-light text-slate-300 leading-relaxed mt-1.5">
+                      <p className="text-[13px] font-light text-slate-300 leading-relaxed mt-1">
                         {e.text}
                       </p>
                     </motion.div>
