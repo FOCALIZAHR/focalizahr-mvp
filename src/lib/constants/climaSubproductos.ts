@@ -8,7 +8,15 @@
 // (son estructura de navegación, no narrativa). Los íconos son estructurales.
 // ════════════════════════════════════════════════════════════════════════════
 
-import { Film, Radar, Trophy, LayoutGrid, ClipboardCheck, type LucideIcon } from 'lucide-react';
+import {
+  Film,
+  Radar,
+  Trophy,
+  LayoutGrid,
+  ClipboardCheck,
+  NotebookPen,
+  type LucideIcon,
+} from 'lucide-react';
 import type { ClimaSubproducto } from '@/types/clima';
 
 export interface ClimaSubproductoDef {
@@ -25,6 +33,11 @@ export const CLIMA_SUBPRODUCTOS: ClimaSubproductoDef[] = [
   { id: 'ranking', label: 'Ranking', icon: Trophy },
   { id: 'dimensiones', label: 'Dimensiones', icon: LayoutGrid },
   { id: 'planes', label: 'Planes de Acción', icon: ClipboardCheck },
+  // 6ª card. Las otras cinco son de CONSULTA; ésta es la única donde se ESCRIBE:
+  // el responsable de un departamento registra qué hizo con sus focos de clima.
+  // Es también la única gateada por contenido — aparece solo si el viewer tiene
+  // focos asignados (una card que lleva a una pantalla vacía es ruido).
+  { id: 'bitacora', label: 'Bitácora de Acciones', icon: NotebookPen },
 ];
 
 export function climaSubproductoLabel(id: ClimaSubproducto): string {

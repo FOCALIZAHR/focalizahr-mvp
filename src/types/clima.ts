@@ -205,8 +205,17 @@ export type ClimaRailFilter = 'todos' | RiskZone;
 
 /** Subproductos de Clima — las cards del Rail (v3 §3A). Cada una abre su
  *  propia vista completa; el filtrado jerárquico se resuelve DENTRO de cada
- *  vista (patrón `scope`), nunca en el Rail. `planes` = 5ª card (Gate 5D). */
-export type ClimaSubproducto = 'cascada' | 'analisis' | 'ranking' | 'dimensiones' | 'planes';
+ *  vista (patrón `scope`), nunca en el Rail. `planes` = 5ª card (Gate 5D).
+ *  `bitacora` = 6ª card: la superficie del JEFE (registra qué hizo con sus focos),
+ *  a diferencia de las otras cinco, que son de consulta. Es la ÚNICA gateada por
+ *  contenido: aparece solo si el viewer tiene focos asignados. */
+export type ClimaSubproducto =
+  | 'cascada'
+  | 'analisis'
+  | 'ranking'
+  | 'dimensiones'
+  | 'planes'
+  | 'bitacora';
 
 export interface ClimaCinemaStats {
   deptCount: number;

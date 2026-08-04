@@ -23,6 +23,7 @@ import ClimaRail from './ClimaRail';
 import ClimaSubproductoScaffold from './ClimaSubproductoScaffold';
 import ClimaDimensionesView from './ClimaDimensionesView';
 import ClimaPlanesView from './planes/ClimaPlanesView';
+import ClimaBitacoraView from './bitacora/ClimaBitacoraView';
 import DepartmentSpotlightCard from './DepartmentSpotlightCard';
 import ClimaChapterView from './ClimaChapterView';
 import ClimaIntroSequence from './cascada/ClimaIntroSequence';
@@ -185,10 +186,19 @@ export default function ClimaCinemaOrchestrator({
             />
           )}
 
+          {showSubproducto && activeSubproducto === 'bitacora' && (
+            <ClimaBitacoraView
+              key="subproducto-bitacora"
+              campaignId={hook.selectedCampaignId}
+              onBack={hook.exitSubproducto}
+            />
+          )}
+
           {showSubproducto &&
             activeSubproducto &&
             activeSubproducto !== 'dimensiones' &&
-            activeSubproducto !== 'planes' && (
+            activeSubproducto !== 'planes' &&
+            activeSubproducto !== 'bitacora' && (
               <ClimaSubproductoScaffold
                 key={`subproducto-${activeSubproducto}`}
                 subproducto={activeSubproducto}
