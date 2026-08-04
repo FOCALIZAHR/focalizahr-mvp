@@ -37,7 +37,7 @@ import type {
   ClimaAtacarCausaEntryDTO,
   ClimaAtacarCausaLogDTO,
 } from '@/types/clima-atacar-causa';
-import type { ClimaBitacoraItemDTO } from '@/types/clima-bitacora';
+import type { ClimaBitacoraEntryDTO, ClimaBitacoraItemDTO } from '@/types/clima-bitacora';
 import { z } from 'zod';
 
 const TEXT_MAX = 200;
@@ -137,10 +137,119 @@ const BodySchema = z.object({
 //
 // Todo se resuelve en el servidor. El cliente no elige nada ni filtra nada.
 // ════════════════════════════════════════════════════════════════════════════
+/**
+ * Resuelve el autor de un conjunto de entradas: nombre legible, cargo y relación con el
+ * departamento. Un solo query para todas.
+ *
+ * SIN filtro isActive a propósito: quien escribió y después se fue de la empresa igual
+ * firmó esa entrada; borrarle el nombre reescribiría la bitácora.
+ *
+ * `relation` (D5) se deriva contra el responsable resuelto de HOY. Es del DEPARTAMENTO,
+ * no de quien mira: la misma entrada da el mismo valor para cualquier lector.
+ */
+async function resolveEntryAuthors(
+  accountId: string,
+  rows: Array<{
+    id: string;
+    text: string;
+    createdAt: Date;
+    createdBy: string | null;
+    climaActionLogId: string;
+  }>,
+  resolvedResponsableOf: (climaActionLogId: string) => string | null
+): Promise<Map<string, ClimaBitacoraEntryDTO>> {
+  const authorIds = [...new Set(rows.map((e) => e.createdBy).filter((id): id is string => !!id))];
+  const authors = authorIds.length
+    ? await prisma.employee.findMany({
+        where: { id: { in: authorIds }, accountId },
+        select: { id: true, fullName: true, position: true },
+      })
+    : [];
+  const authorById = new Map(authors.map((e) => [e.id, e]));
+
+  const out = new Map<string, ClimaBitacoraEntryDTO>();
+  for (const e of rows) {
+    const emp = e.createdBy ? authorById.get(e.createdBy) : null;
+    out.set(e.id, {
+      id: e.id,
+      text: e.text,
+      createdAt: e.createdAt.toISOString(),
+      author: emp
+        ? {
+            name: formatDisplayName(emp.fullName),
+            position: emp.position,
+            relation:
+              e.createdBy === resolvedResponsableOf(e.climaActionLogId) ? 'responsable' : 'superior',
+          }
+        : null,
+    });
+  }
+  return out;
+}
+
+/** Sub-modo "Ver anteriores": página de entradas de UN log, con autor resuelto. */
+async function getMineEntriesPage(
+  userContext: ReturnType<typeof extractUserContext>,
+  logId: string,
+  searchParams: URLSearchParams
+): Promise<NextResponse> {
+  const log = await prisma.climaActionLog.findFirst({
+    where: { id: logId, accountId: userContext.accountId },
+    select: { id: true, departmentId: true },
+  });
+  if (!log) {
+    return NextResponse.json({ success: false, error: 'Hallazgo no encontrado' }, { status: 404 });
+  }
+
+  // Mismo guard que el resto de la Bitácora: el viewer responde por ese departamento.
+  // Más estricto que el guard de lectura general (que además deja pasar roles globales
+  // y el subárbol del JWT): acá la pregunta es "¿es TUYO?", no "¿podés verlo?".
+  const { resolved, chainEmployeeIds } = await resolveResponsableChain({
+    departmentId: log.departmentId,
+    accountId: userContext.accountId,
+  });
+  if (!userContext.employeeId || !chainEmployeeIds.has(userContext.employeeId)) {
+    return NextResponse.json({ success: false, error: 'Sin acceso a este hallazgo' }, { status: 403 });
+  }
+
+  const limit = Math.min(
+    Math.max(parseInt(searchParams.get('limit') || `${ENTRIES_PAGE_DEFAULT}`, 10) || ENTRIES_PAGE_DEFAULT, 1),
+    ENTRIES_PAGE_MAX
+  );
+  const offset = Math.max(parseInt(searchParams.get('offset') || '0', 10) || 0, 0);
+
+  const [rows, entriesCount] = await Promise.all([
+    prisma.climaActionLogEntry.findMany({
+      where: { climaActionLogId: log.id, accountId: userContext.accountId },
+      orderBy: { createdAt: 'desc' },
+      skip: offset,
+      take: limit,
+      select: { id: true, text: true, createdAt: true, createdBy: true, climaActionLogId: true },
+    }),
+    prisma.climaActionLogEntry.count({
+      where: { climaActionLogId: log.id, accountId: userContext.accountId },
+    }),
+  ]);
+
+  const resolvedId = resolved.source === 'responsable' ? resolved.employeeId : null;
+  const byId = await resolveEntryAuthors(userContext.accountId, rows, () => resolvedId);
+  const entries = rows.map((r) => byId.get(r.id)!);
+
+  return NextResponse.json({ success: true, data: { entries, entriesCount } });
+}
+
 async function getMine(
   userContext: ReturnType<typeof extractUserContext>,
   searchParams: URLSearchParams
 ): Promise<NextResponse> {
+  // ── Sub-modo paginación: ?scope=mine&logId=<id>&offset=<n> ("Ver anteriores") ──
+  // Vive DENTRO de `mine` y no en el modo entradas de Tab 2 porque necesita `author`,
+  // que ese modo no resuelve a propósito (Tab 2 no lo muestra y no paga el join).
+  const pageLogId = searchParams.get('logId');
+  if (pageLogId) {
+    return await getMineEntriesPage(userContext, pageLogId, searchParams);
+  }
+
   const campaignId = searchParams.get('campaignId');
   if (!campaignId) {
     return NextResponse.json({ success: false, error: 'campaignId requerido' }, { status: 400 });
@@ -233,39 +342,18 @@ async function getMine(
   ]);
   const deptNameById = new Map(depts.map((d) => [d.id, d.displayName]));
 
-  // Autores: un query para todas las entradas. SIN filtro isActive a propósito — quien
-  // escribió y después se fue de la empresa igual firmó esa entrada; borrarle el nombre
-  // reescribiría la bitácora. formatDisplayName y position (jobTitle está vacío en la
-  // nómina real) se resuelven acá para que el DTO viaje ya legible.
-  const authorIds = [...new Set(allEntries.map((e) => e.createdBy).filter((id): id is string => !!id))];
-  const authors = authorIds.length
-    ? await prisma.employee.findMany({
-        where: { id: { in: authorIds }, accountId: userContext.accountId },
-        select: { id: true, fullName: true, position: true },
-      })
-    : [];
-  const authorById = new Map(authors.map((e) => [e.id, e]));
-
+  // Autoría: misma resolución que el sub-modo de paginación (fuente única).
   const deptOfLog = new Map(matched.map((l) => [l.id, l.departmentId]));
-  const entriesByLog = new Map<string, ClimaAtacarCausaEntryDTO[]>();
+  const entryById = await resolveEntryAuthors(
+    userContext.accountId,
+    allEntries,
+    (climaActionLogId) => chains.get(deptOfLog.get(climaActionLogId) ?? '')?.resolvedEmployeeId ?? null
+  );
+
+  const entriesByLog = new Map<string, ClimaBitacoraEntryDTO[]>();
   for (const e of allEntries) {
-    const emp = e.createdBy ? authorById.get(e.createdBy) : null;
-    const chain = chains.get(deptOfLog.get(e.climaActionLogId) ?? '');
     const arr = entriesByLog.get(e.climaActionLogId) ?? [];
-    arr.push({
-      id: e.id,
-      text: e.text,
-      createdAt: e.createdAt.toISOString(),
-      // D5: derivado en LECTURA contra el responsable resuelto de HOY. Orientativo, no
-      // evidencia; si cambia el responsable, entradas viejas cambian de etiqueta.
-      author: emp
-        ? {
-            name: formatDisplayName(emp.fullName),
-            position: emp.position,
-            relation: e.createdBy === chain?.resolvedEmployeeId ? 'responsable' : 'superior',
-          }
-        : null,
-    });
+    arr.push(entryById.get(e.id)!);
     entriesByLog.set(e.climaActionLogId, arr);
   }
 
