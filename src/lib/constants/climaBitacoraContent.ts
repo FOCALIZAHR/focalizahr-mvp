@@ -29,6 +29,8 @@ export const BITACORA_ENTRIES_PREVIEW = 3;
 export const BITACORA_RECENT_HOURS = 24;
 
 export const BITACORA_SCREEN = {
+  /** Salida al lobby de Clima. Nombra el destino, no la operación. */
+  back: 'Volver a Clima',
   kicker: 'Clima · Tu equipo',
   titleWhite: 'Bitácora de',
   titleGradient: 'acciones',
@@ -90,9 +92,17 @@ export function bitacoraCounter(index: number, total: number): string {
   return `${index + 1} de ${total}`;
 }
 
-/** Píldora: dimensión + cuántos registros lleva. `Liderazgo · 2` */
-export function bitacoraPill(dimension: string, registros: number): string {
-  return `${dimension} · ${registros}`;
+/**
+ * Contador de registros de una píldora. La píldora es de DOS LÍNEAS y el
+ * departamento va aparte, así que acá solo viaja el número.
+ *
+ * Por qué dos líneas: un jefe puede responder por más de un departamento, y con la
+ * píldora de una sola línea se veían dos "Autonomía" y dos "Liderazgo"
+ * indistinguibles hasta tocarlas. En una pantalla donde se escribe un registro
+ * atribuible, eso es poder registrar sobre el foco equivocado.
+ */
+export function bitacoraPillCount(registros: number): string {
+  return `· ${registros}`;
 }
 
 /** "Ver anteriores (5)" cuando hay más de las visibles. */

@@ -304,7 +304,7 @@ async function getMine(
   // `count=1`: solo el contador, para la card del Rail. Vive como parámetro y no como
   // endpoint aparte para que la regla de cadena tenga UN solo lugar donde vivir.
   const countOnly = searchParams.get('count') === '1';
-  const emptyData = countOnly ? { pendingCount: 0 } : { items: [], pendingCount: 0 };
+  const emptyData = countOnly ? { pendingCount: 0 } : { items: [], pendingCount: 0, viewer: null };
 
   // Identidad del empleado: vínculo directo, y si no está poblado, fallback por email.
   // Sin ninguno de los dos no hay identidad que comparar contra la cadena. Vacío y 200,
@@ -374,7 +374,7 @@ async function getMine(
     return NextResponse.json({ success: true, data: emptyData });
   }
 
-  const [depts, allEntries] = await Promise.all([
+  const [depts, allEntries, viewerEmp] = await Promise.all([
     prisma.department.findMany({
       where: { id: { in: [...new Set(matched.map((l) => l.departmentId))] }, accountId: userContext.accountId },
       select: { id: true, displayName: true },
@@ -387,8 +387,17 @@ async function getMine(
       orderBy: { createdAt: 'desc' },
       select: { id: true, text: true, createdAt: true, createdBy: true, climaActionLogId: true },
     }),
+    // Identidad del viewer: la MISMA que el guard usó para filtrar. La pantalla la
+    // muestra para que quien escribe vea con qué nombre va a quedar firmado.
+    prisma.employee.findFirst({
+      where: { id: viewerEmployeeId, accountId: userContext.accountId },
+      select: { fullName: true, position: true },
+    }),
   ]);
   const deptNameById = new Map(depts.map((d) => [d.id, d.displayName]));
+  const viewer = viewerEmp
+    ? { name: formatDisplayName(viewerEmp.fullName), position: viewerEmp.position }
+    : null;
 
   // Autoría: misma resolución que el sub-modo de paginación (fuente única).
   const deptOfLog = new Map(matched.map((l) => [l.id, l.departmentId]));
@@ -440,7 +449,7 @@ async function getMine(
     };
   });
 
-  return NextResponse.json({ success: true, data: { items, pendingCount } });
+  return NextResponse.json({ success: true, data: { items, pendingCount, viewer } });
 }
 
 // ════════════════════════════════════════════════════════════════════════════

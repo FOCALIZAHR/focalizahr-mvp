@@ -69,9 +69,25 @@ export interface ClimaBitacoraItemDTO {
   entries: ClimaBitacoraEntryDTO[];
 }
 
+/**
+ * Quién está mirando, resuelto EN EL SERVIDOR.
+ *
+ * Es la identidad que el guard usó para decidir qué focos devolver, no la que el
+ * cliente supone a partir del nombre del login. Si algún día `User.name` y el
+ * Employee divergen, la pantalla tiene que mostrar la que manda, porque es la que
+ * va a quedar firmando lo que se escriba.
+ */
+export interface ClimaBitacoraViewerDTO {
+  /** Ya pasado por formatDisplayName() en el servidor. */
+  name: string;
+  position: string | null;
+}
+
 /** Response del modo `scope=mine`. */
 export interface ClimaBitacoraMineResponse {
   items: ClimaBitacoraItemDTO[];
   /** Hallazgos del viewer sin registrar (ClimaActionLog.actionText === null). */
   pendingCount: number;
+  /** `null` cuando no hay identidad resuelta (vínculo sin poblar) o no hay focos. */
+  viewer: ClimaBitacoraViewerDTO | null;
 }
