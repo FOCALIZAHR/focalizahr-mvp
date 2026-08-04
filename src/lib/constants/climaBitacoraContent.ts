@@ -69,6 +69,44 @@ export const BITACORA_SCREEN = {
   },
 } as const;
 
+/**
+ * Portada. Primer estado de la pantalla, antes del carrusel.
+ *
+ * Existe porque entrar directo al primer foco no le dice al jefe cuántos tiene ni
+ * que la empresa considera esto importante: el "1 de 8" es navegación, no mensaje.
+ *
+ * Patrón: PORTADA UNIVERSAL (`focalizahr-design` → SKILL.md, Gate 1: "mensaje corto
+ * más 1 CTA, sin identidad de persona, sin split"), con el molde visual de
+ * CompensationPortada. NO es el PATRÓN 5 de page-patterns.md:211-270, que trae caja
+ * de misión, gauge y grilla de exploración, y es una ruta propia.
+ *
+ * Sin contadores en cero: decirle "0 bitácoras iniciadas" es reprocharle algo antes
+ * de que lea nada.
+ */
+export const BITACORA_PORTADA = {
+  kicker: 'Planes de Clima vigentes',
+  /** Verbo que nombra el resultado, no la operación. */
+  cta: 'Iniciar Bitácora de Acción',
+  /** Vuelta a la portada desde el carrusel. */
+  back: 'Ver el resumen',
+
+  narrative:
+    'Tus compromisos de Clima están activos. Registra lo que hiciste con cada uno. ' +
+    'Un plan sin registro no es una intervención, es una declaración de intenciones sin evidencia.',
+  consequence:
+    'Sin bitácora documentada, el próximo ciclo de Clima medirá percepción contra azar, ' +
+    'no contra la efectividad de tu liderazgo.',
+} as const;
+
+/**
+ * Bajada del número hero. Dice los DOS datos reales: cuántos focos y en cuántos
+ * equipos. "8 compromisos" a secas miente por omisión, porque son 8 hallazgos
+ * repartidos en 2 departamentos, y si el número miente el resto pierde credibilidad.
+ */
+export function bitacoraPortadaSuffix(focos: number, equipos: number): string {
+  return `${focos === 1 ? 'foco' : 'focos'} en ${equipos} ${equipos === 1 ? 'equipo' : 'equipos'}`;
+}
+
 export const BITACORA_PLAN = {
   stepsLabel: 'Pasos acordados:',
   notesLabel: 'Nota de RRHH',

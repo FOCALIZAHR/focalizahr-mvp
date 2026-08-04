@@ -38,6 +38,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft,
+  ArrowRight,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -54,6 +55,7 @@ import { useToast } from '@/components/ui/toast-system';
 import { dimensionLabel } from '@/lib/constants/climaDimensions';
 import {
   BITACORA_SCREEN,
+  BITACORA_PORTADA,
   BITACORA_PLAN,
   BITACORA_FORM,
   BITACORA_HISTORY,
@@ -61,6 +63,7 @@ import {
   BITACORA_TEXT_MAX,
   BITACORA_RECENT_HOURS,
   bitacoraCounter,
+  bitacoraPortadaSuffix,
   bitacoraPill,
   bitacoraAbreviarDepartamentos,
   bitacoraSeeAll,
@@ -104,6 +107,11 @@ export default function ClimaBitacoraView({ campaignId, onBack }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  /**
+   * Motor de dos estados dentro del MISMO contenedor: portada, clic en el CTA, y el
+   * cuerpo pasa al carrusel. Sin scroll y sin cambiar de ruta.
+   */
+  const [vista, setVista] = useState<'portada' | 'focos'>('portada');
   const pillsRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
@@ -123,6 +131,7 @@ export default function ClimaBitacoraView({ campaignId, onBack }: Props) {
       setItems(data.items ?? []);
       setViewer(data.viewer ?? null);
       setActiveIdx(0);
+      setVista('portada');
       setStatus('ready');
     } catch {
       setStatus('error');
@@ -190,7 +199,9 @@ export default function ClimaBitacoraView({ campaignId, onBack }: Props) {
       el.removeEventListener('scroll', medirDesborde);
       window.removeEventListener('resize', medirDesborde);
     };
-  }, [medirDesborde, status, items.length]);
+    // `vista` entra en las deps porque la barra NO existe en la portada: sin él, el
+    // ref sería null al montar y las flechas nunca se medirían.
+  }, [medirDesborde, status, items.length, vista]);
 
   /** Corre ~80% del ancho visible: deja una píldora de contexto entre salto y salto. */
   const desplazarPildoras = useCallback((direccion: 1 | -1) => {
@@ -375,6 +386,45 @@ export default function ClimaBitacoraView({ campaignId, onBack }: Props) {
     );
   }
 
+  // ── PORTADA — primer estado. Molde CompensationPortada: número hero en BLANCO,
+  //    narrativa, un solo CTA. Sin identidad de persona, sin split (SKILL.md Gate 1). ──
+  if (vista === 'portada') {
+    const equipos = new Set(items.map((i) => i.departmentId)).size;
+    return shell(
+      <>
+        {barraSuperior}
+        <div className="flex flex-col items-center text-center py-8 md:py-12 max-w-xl mx-auto">
+          {/* Número en blanco, NO cian: el cian es del CTA y no deben competir. */}
+          <p className="text-[64px] md:text-[72px] font-extralight tabular-nums text-white leading-[0.9]">
+            {items.length}
+          </p>
+          <p className="text-sm font-light text-slate-500 mt-1">
+            {bitacoraPortadaSuffix(items.length, equipos)}
+          </p>
+          <p className="text-[10px] uppercase tracking-widest text-slate-500 mt-5">
+            {BITACORA_PORTADA.kicker}
+          </p>
+          <p className="text-base font-light text-slate-300 leading-relaxed mt-5">
+            {BITACORA_PORTADA.narrative}
+          </p>
+          <p className="text-sm font-light text-slate-500 leading-relaxed mt-4">
+            {BITACORA_PORTADA.consequence}
+          </p>
+          <div className="mt-8">
+            <PrimaryButton
+              size="md"
+              icon={ArrowRight}
+              iconPosition="right"
+              onClick={() => setVista('focos')}
+            >
+              {BITACORA_PORTADA.cta}
+            </PrimaryButton>
+          </div>
+        </div>
+      </>
+    );
+  }
+
   return shell(
     <>
       {barraSuperior}
@@ -383,10 +433,39 @@ export default function ClimaBitacoraView({ campaignId, onBack }: Props) {
           Patrón canónico de pills (page-patterns.md:107-131): whitespace-nowrap,
           rounded-lg, scroll horizontal. El contador no scrollea, para saber cuántos
           focos hay sin recorrer la barra. */}
-      <div className="flex items-center gap-3 mt-4 min-h-[44px]">
+      <div className="flex items-center gap-2 mt-4 min-h-[44px]">
+        <button
+          onClick={() => setVista('portada')}
+          className="shrink-0 flex items-center gap-1 text-[10px] font-light text-slate-500 hover:text-slate-300 transition-colors"
+        >
+          <ArrowLeft className="w-3 h-3" /> {BITACORA_PORTADA.back}
+        </button>
         <span className="shrink-0 text-[10px] font-mono uppercase tracking-wider text-slate-500 tabular-nums">
           {bitacoraCounter(activeIdx, items.length)}
         </span>
+
+        {/* Flechas FUERA del área de scroll: son hermanas del contenedor que scrollea,
+            no absolutas encima. Antes tapaban las píldoras de los extremos; sacarlas del
+            área elimina la superposición por estructura, sin taparla con fondo sólido.
+
+            Patrón del módulo (ClimaRail.tsx:125-131), más chicas porque acá la barra mide
+            44px y no 100+. Dos diferencias deliberadas: no se revelan en hover (esconder
+            detrás de un hover la única forma de llegar a las píldoras con mouse recrea el
+            problema que vinieron a resolver), y se apagan del lado sin recorrido.
+
+            `invisible` en vez de desmontar: reservan su ancho igual, así la barra no salta
+            cuando aparecen o desaparecen. Solo en escritorio: en táctil anda el arrastre. */}
+        <button
+          onClick={() => desplazarPildoras(-1)}
+          aria-label="Focos anteriores"
+          className={cn(
+            'hidden md:flex shrink-0 w-7 h-7 items-center justify-center rounded-full bg-slate-800/90 border border-slate-700 hover:bg-slate-700 transition-colors',
+            !canLeft && 'invisible pointer-events-none'
+          )}
+        >
+          <ChevronLeft className="w-4 h-4 text-white" />
+        </button>
+
         {/* `min-w-0` NO es cosmético: sin él este div es un hijo flex con
             `min-width: auto`, o sea que no puede encogerse por debajo del ancho de su
             contenido. Con 8 focos crecía hasta las 8 píldoras, nunca desbordaba, nunca
@@ -396,38 +475,10 @@ export default function ClimaBitacoraView({ campaignId, onBack }: Props) {
             El degradado del borde derecho es la señal de que la lista sigue. Va inline
             porque Tailwind no trae utilidad de máscara y no es color: es un recorte de
             opacidad. Queda fijo aunque se llegue al final (apagarlo pide un listener de
-            scroll; decisión de Victor 2026-08-04: no vale el estado).
-
-            El `min-w-0` se mudó a este wrapper: las flechas van absolutas sobre la barra
-            y necesitan un ancestro `relative` que no sea el contenedor que scrollea. */}
-        <div className="relative flex-1 min-w-0">
-          {/* Flechas: patrón del módulo (ClimaRail.tsx:125-131), más chicas porque acá la
-              barra mide 44px y no 100+. Dos diferencias deliberadas con ese patrón:
-              no se revelan en hover (esconder la única forma de llegar a las píldoras
-              detrás de un hover recrea el problema que vinieron a resolver), y se ocultan
-              del lado sin recorrido. Solo en escritorio: en táctil el arrastre funciona y
-              acá taparían píldoras en 320px. */}
-          {canLeft && (
-            <button
-              onClick={() => desplazarPildoras(-1)}
-              aria-label="Focos anteriores"
-              className="hidden md:flex absolute left-0 top-1/2 -translate-y-1/2 z-10 w-7 h-7 items-center justify-center rounded-full bg-slate-800/90 border border-slate-700 hover:bg-slate-700 transition-colors shadow-lg"
-            >
-              <ChevronLeft className="w-4 h-4 text-white" />
-            </button>
-          )}
-          {canRight && (
-            <button
-              onClick={() => desplazarPildoras(1)}
-              aria-label="Focos siguientes"
-              className="hidden md:flex absolute right-0 top-1/2 -translate-y-1/2 z-10 w-7 h-7 items-center justify-center rounded-full bg-slate-800/90 border border-slate-700 hover:bg-slate-700 transition-colors shadow-lg"
-            >
-              <ChevronRight className="w-4 h-4 text-white" />
-            </button>
-          )}
+            scroll; decisión de Victor 2026-08-04: no vale el estado). */}
           <div
             ref={pillsRef}
-            className="flex gap-2 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] scroll-smooth -mx-1 px-1 py-1"
+            className="flex-1 min-w-0 flex gap-2 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] scroll-smooth -mx-1 px-1 py-1"
             style={{
               scrollSnapType: 'x proximity',
               WebkitOverflowScrolling: 'touch',
@@ -443,11 +494,19 @@ export default function ClimaBitacoraView({ campaignId, onBack }: Props) {
                 setHistoryOpen(false);
               }}
               style={{ scrollSnapAlign: 'start' }}
+              /* Base: patrón de pills de la skill (page-patterns.md:107-131).
+                 DOS DIVERGENCIAS deliberadas sobre ese patrón:
+                 1. Glow en la activa. La skill no define glow para pills (solo para
+                    Tesla line y botones, premium-components.md). Dentro de paleta.
+                 2. Hover más marcado. La skill llega a `hover:border-slate-600`; las
+                    inactivas se leían como etiquetas deshabilitadas y no daban señal de
+                    ser clicables. Sube el texto a slate-300 y el hover enciende borde
+                    cian tenue, texto blanco y fondo más claro. */
               className={cn(
                 'shrink-0 px-3 py-1.5 rounded-lg text-[12px] font-light whitespace-nowrap transition-colors border',
                 i === activeIdx
-                  ? 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30'
-                  : 'bg-slate-800/60 text-slate-400 border-slate-700 hover:border-slate-600'
+                  ? 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30 shadow-[0_0_12px_rgba(34,211,238,0.15)]'
+                  : 'bg-slate-800/60 text-slate-300 border-slate-700 hover:border-cyan-500/30 hover:text-white hover:bg-slate-800'
               )}
             >
               {bitacoraPill(
@@ -456,7 +515,6 @@ export default function ClimaBitacoraView({ campaignId, onBack }: Props) {
               )}
             </button>
           ))}
-          </div>
         </div>
       </div>
 
