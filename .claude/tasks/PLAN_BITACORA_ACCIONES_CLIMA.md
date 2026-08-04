@@ -379,6 +379,43 @@ Entries con texto del smoke = 0
 
 ---
 
+## AS-BUILT F3 + F4 — ✅ 2026-08-04 · GATE CERRADO
+
+**Nuevos:** `src/lib/constants/climaBitacoraContent.ts` ·
+`src/app/dashboard/clima/components/bitacora/ClimaBitacoraView.tsx`
+**Cableado:** union en `types/clima.ts` · card en `climaSubproductos.ts` · rama en
+`ClimaCinemaOrchestrator.tsx`. **Ningún archivo de Planes, Tab 1 ni Tab 2 fue tocado.**
+
+Landing Card 60/40, chrome canónico sin color protagonista, píldoras con scroll-snap y
+contador fijo "1 de N", borradores por foco, envío con espera real del servidor y texto
+preservado ante error, autoría con nombre y cargo sin etiqueta de jerarquía.
+
+**F4 — el gating NO se implementó, a propósito.** La card se muestra siempre. Con el
+vínculo Employee↔User sin poblar, `pendingCount` da 0 para todos, así que el gate
+escondería la pantalla entera en vez de filtrarla. Queda anotado como una línea en
+`climaSubproductos.ts`, junto a la card.
+
+### ⛔ La pantalla está construida y ESPERANDO el vínculo Employee↔User
+
+Hoy devuelve estado vacío a **todos** los usuarios: `User.employeeId` está en NULL en
+los 12 de la cuenta y la identidad del jefe no se puede resolver de otra forma.
+
+Lo verificado en el camino, todo con evidencia en el doc de arquitectura:
+
+- El claim SÍ existe (`api/auth/user/login/route.ts:141` → `middleware.ts:215`). Un
+  reporte anterior de esta sesión decía lo contrario mirando el login de **cuenta**, que
+  es otro archivo. Corregido.
+- `User.departmentId` viaja y está poblado en 2 de 12, pero **no sustituye** a
+  `employeeId`: dice dónde está una persona, no de qué responde. La responsabilidad vive
+  en `Department.responsableId → Employee`.
+- El fallback por email **resuelve a la persona equivocada**: 199 de 219 empleados
+  comparten `1uan@corre.cl` y 3 de los 4 responsables lo tienen. Descartado.
+
+Anclado en `ARQUITECTURA_VINCULO_EMPLOYEE_USER_v1.md` §Etapa 3, con los 4 commits y el
+punto exacto donde se enciende (`resolveViewerEmployeeId`).
+
+---
+
 ## AS-BUILT F2 — ✅ 2026-08-03
 
 **Código** (`tsc --noEmit` limpio):

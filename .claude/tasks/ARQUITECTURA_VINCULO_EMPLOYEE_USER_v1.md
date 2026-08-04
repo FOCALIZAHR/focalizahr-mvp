@@ -144,6 +144,56 @@ Performance, Evaluator, Succession, Auth), smoke test real por gate.
 > "¿esta meta es mía?") hereda el vector de escalada de token legacy + header forjado
 > mientras `/api/auth/login` y `/api/auth/register` sigan acuñando tokens sin `userId`.
 
+#### 📌 Consumidor ya construido y ESPERANDO: Bitácora de Acciones de Clima
+
+**Es el primer código del proyecto que depende de esta etapa para funcionar, no solo
+para mejorar.** Está terminado, probado contra datos reales y alcanzable desde el Rail
+de Clima, pero **hoy le devuelve pantalla vacía a todos los usuarios**: sin
+`User.employeeId` no hay identidad que comparar contra la cadena de responsables.
+
+Commits (2026-08-03/04, pusheados hasta `88dba52`):
+
+| Commit | Qué |
+|---|---|
+| `a24047f` | Guard de línea jerárquica: escriben el responsable resuelto y sus superiores |
+| `8dc2bf0` | `GET /api/clima/action-log?scope=mine` — modo persona-céntrico |
+| `b2c2584` | Desacople del contrato de Tab 2 + paginación con autoría |
+| `c80d0a6` | La pantalla + 6ª card del Rail |
+
+Punto exacto donde se enciende: `resolveViewerEmployeeId` en
+`src/app/api/clima/action-log/route.ts`. Devuelve `userContext.employeeId` y nada más.
+Cuando esta etapa puebla el vínculo, la pantalla funciona sola: **no hay nada más que
+cambiar ahí**. Queda además una línea pendiente, anotada en
+`src/lib/constants/climaSubproductos.ts`: gatear la card del Rail por `pendingCount > 0`
+(hoy daría 0 para todos y escondería la pantalla en vez de filtrarla).
+
+#### ⛔ El fallback por email NO es una salida — está medido
+
+Antes de esta etapa, la tentación obvia es resolver el Employee por
+`x-user-email`, como hacen los ~30 sitios legacy. **En la cuenta de producción eso
+resuelve a la persona equivocada**, medido el 2026-08-04:
+
+```
+Employees en la cuenta                 219
+Emails distintos                        20
+Comparten '1uan@corre.cl'              199  (91%), de los cuales 44 ACTIVE
+
+findFirst({ email:'1uan@corre.cl', status:'ACTIVE' })
+  -> VALENZUELA LANDEROS JUAN FRANCISCO (cmktdylrw0009vvgx7mm07irz)
+El responsable de Comercial es
+  -> GONZALEZ JIMENEZ LUCIANO SALVADOR (cmktf3127008xvvgxpxqy14xq)
+Coinciden: false
+```
+
+`1uan@corre.cl` es un placeholder de una carga de nómina. **Tres de los cuatro
+responsables de departamento lo tienen**, así que el lookup por email falla justo en
+las personas que este vínculo tiene que identificar.
+
+Consecuencia para el orden de trabajo: **la Etapa 5 (backfill) no puede apoyarse en el
+email como criterio de match** para esta cuenta. Y cualquier sitio legacy que hoy
+resuelva identidad por email está resolviendo mal, no solo "de forma frágil" — lo que
+sube la prioridad del recableo de esta etapa por encima de lo que sugiere su nombre.
+
 ### Etapa 4 — Aprovisionamiento en el resto de los puntos de creación
 **Estado: PENDIENTE — depende de Etapa 1**
 

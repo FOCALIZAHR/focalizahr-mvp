@@ -33,6 +33,38 @@ if (hasPermission(role, 'campaigns:manage')) {
 
 **Por qué es malo:** Si agregan/quitan roles, hay que cambiar en 50 archivos.
 
+### 🔴 Caso real (jul 2026) — por qué esto NO es teórico
+
+Una auditoría completa del proyecto encontró **14 arrays de roles hardcodeados**
+que redefinían "acceso global" a mano, en vez de importar `GLOBAL_ACCESS_ROLES` o
+llamar a `hasPermission()`. De esos, **5 eran bugs confirmados de acceso** —
+roles que deberían tener acceso a un recurso y no lo tenían (o viceversa), porque
+alguien clonó un array de roles en algún momento del pasado y ese clon quedó
+congelado mientras la fuente única (`permissions.ts`) seguía evolucionando.
+
+El caso más grave (`AuthorizationService.ts`, función `buildParticipantAccessFilter`):
+un array local `globalRoles` excluía a `HR_ADMIN` y `HR_OPERATOR` del acceso
+global a participantes/campañas — mientras que la constante oficial
+`GLOBAL_ACCESS_ROLES` sí los incluye desde Feb 2025. El array clonado nunca se
+actualizó cuando se corrigió la fuente única.
+
+Además se encontró un patrón más grave todavía: **7 de 9 endpoints de un módulo
+completo (`executive-hub/*`) no tenían NINGÚN gate de autorización por rol** —
+solo verificaban `accountId` (autenticación), confundiendo un array de *scope*
+(quién ve sin filtro departamental) con un gate real de *permiso* (quién puede
+acceder). Son conceptos distintos y mezclarlos escondió la ausencia total de
+`hasPermission()` en la mayoría del módulo.
+
+**La lección:** cada array de roles escrito a mano es una copia que puede
+desincronizarse de `permissions.ts` sin que nadie lo note, hasta que alguien
+audita todo el proyecto a mano. La única forma de que esto no vuelva a pasar es
+no crear el array nunca — importar la constante o llamar `hasPermission()`
+siempre, sin excepción, incluso para un endpoint "chico" o "interno".
+
+Ver `DEUDA_RBAC_ARRAYS_HARDCODEADOS_v1.md` (Project Knowledge) para el detalle
+completo de los 14 sitios y su estado de corrección — a la fecha, **pendiente
+de fix**, no tratar como resuelto.
+
 ---
 
 ## ❌ ANTI-PATRÓN 2: Query Sin accountId
@@ -88,6 +120,80 @@ const currentEmployee = await prisma.employee.findFirst({
 ```
 
 **Por qué es malo:** `userContext` solo tiene `accountId`, `role`, `departmentId`, `userId`. El email está en header separado.
+
+---
+
+### ⚠️ El ✅ de arriba es un FALLBACK, no la primera opción
+
+Ese patrón es el **legacy de 35 sitios** que el proyecto **RUT_MAIL** está
+reemplazando. Sigue siendo válido, pero no es lo primero que escribe un endpoint
+nuevo. Referencia: `.claude/tasks/ARQUITECTURA_VINCULO_EMPLOYEE_USER_v1.md`.
+
+**Patrón preferido para endpoints nuevos** — leer `x-employee-id` (viene de
+`User.employeeId`, Etapa 1 de RUT_MAIL) y caer a la búsqueda por email SOLO si ese
+header viene vacío (usuarios todavía no migrados, que hoy son la mayoría):
+
+```typescript
+// 1º: el vínculo directo (Etapa 1 de RUT_MAIL). Ya expuesto por extractUserContext.
+let employeeId = userContext.employeeId
+
+// 2º: fallback legacy por email, solo si el vínculo no está poblado.
+if (!employeeId) {
+  const userEmail = request.headers.get('x-user-email') || ''
+  const currentEmployee = userEmail
+    ? await prisma.employee.findFirst({
+        where: { accountId: userContext.accountId, email: userEmail, status: 'ACTIVE' },
+        select: { id: true },
+      })
+    : null
+  employeeId = currentEmployee?.id ?? null
+}
+
+// 3º: manejar el null explícito. Nunca asumir identidad.
+```
+
+El fallback **corre después**, no en paralelo: cuando el vínculo esté poblado
+(Etapas 4 y 5), la rama por email deja de ejecutarse sola y el día que se borre,
+el endpoint no cambia de comportamiento.
+
+**⛔ NO poblar `User.employeeId` a mano para destrabar un feature.** La Etapa 4
+(aprovisionamiento automático) y la Etapa 5 (backfill) **todavía no están
+diseñadas**. Un vínculo escrito a mano hoy queda fuera de esas etapas y se
+convierte en dato huérfano que nadie sabe reconciliar.
+
+**Por qué el orden importa:** `Employee` y `User` son tablas disjuntas sin FK.
+`User.email` y `Employee.email` pueden no coincidir, y `Employee.email` es nullable
+y no único — por eso el email es el fallback y no la fuente. Es el mismo motivo por
+el que la regla de `SKILL.md` §Vínculo existe.
+
+#### ⛔ "No único" no es teórico: hoy resuelve a la persona equivocada
+
+Medido en la cuenta de producción el 2026-08-04:
+
+```
+Employees en la cuenta                 219
+Emails distintos                        20
+Comparten '1uan@corre.cl'              199  (91%), de los cuales 44 ACTIVE
+
+findFirst({ email:'1uan@corre.cl', status:'ACTIVE' })  ->  VALENZUELA LANDEROS JUAN FRANCISCO
+El responsable de Comercial es                          ->  GONZALEZ JIMENEZ LUCIANO SALVADOR
+```
+
+Es un placeholder de una carga de nómina, y **3 de los 4 responsables de departamento
+lo tienen**. `findFirst` devuelve uno arbitrario de los 44 activos.
+
+**Consecuencia por tipo de ruta:**
+
+- **Lectura** (los ~30 sitios legacy): muestra una lista que no corresponde. Grave,
+  ya conocido, es el comportamiento actual.
+- **Escritura o atribución de identidad** (`createdBy`, `registeredBy`, guards que
+  deciden quién puede escribir): **el fallback NO se usa**. Firmar un registro con la
+  persona equivocada es peor que no tener registro. Si tu endpoint escribe algo
+  atribuible a una persona, maneja el `null` y devuelve vacío o un mensaje honesto.
+
+Precedente aplicado: la Bitácora de Acciones de Clima
+(`src/app/api/clima/action-log/route.ts`, función `resolveViewerEmployeeId`) devuelve
+pantalla vacía a propósito hasta que exista el vínculo, en vez de adivinar.
 
 ---
 
