@@ -76,7 +76,18 @@ export const BITACORA_FORM = {
 export const BITACORA_HISTORY = {
   /** Un renglón al final. Acota a ESTE foco: la bitácora es por hallazgo, no global. */
   label: 'Bitácora de este foco',
-  empty: 'Todavía no hay registros en este foco.',
+
+  /**
+   * Sin registros NO va un disclosure: desplegar la nada es un renglón muerto con
+   * una flecha que no lleva a ningún lado. Va esta línea sola, en su lugar.
+   *
+   * Dice para qué sirve el bloque y nada más. No culpabiliza (no menciona que no
+   * hay registros), no explica cómo se evalúa después, no pone plazo ni instrucción
+   * (Regla 3). Tampoco promete que algo se "abre" o "desbloquea": el bloque ya está
+   * ahí, lo único que falta es texto.
+   */
+  invite: 'Aquí queda lo que registres sobre este foco.',
+
   loadingMore: 'Cargando',
 } as const;
 
@@ -146,9 +157,20 @@ export function bitacoraAbreviarDepartamentos(nombres: string[]): Map<string, st
   return out;
 }
 
-/** Etiqueta de la píldora: `COMERCIAL · Liderazgo`. */
-export function bitacoraPill(departamentoAbreviado: string, dimension: string): string {
-  return `${departamentoAbreviado} · ${dimension}`;
+/**
+ * Etiqueta de la píldora: `COMERCIAL · Liderazgo`.
+ *
+ * `departamentoAbreviado === null` cuando TODOS los focos de la vista son del mismo
+ * departamento: ahí la abreviatura no distingue nada y se come media píldora. Con
+ * seis focos de Atención a Clientes se leía `ATENCIÓN · Autonomía`,
+ * `ATENCIÓN · Crecimiento`, `ATENCIÓN · Desarrollo`: la palabra que se repite ocupa
+ * el lugar de la única que separa una píldora de la otra. El nombre del departamento
+ * ya aparece una vez, dentro de la caja, que es donde corresponde.
+ *
+ * Con dos departamentos o más la abreviatura vuelve, porque ahí sí distingue.
+ */
+export function bitacoraPill(departamentoAbreviado: string | null, dimension: string): string {
+  return departamentoAbreviado ? `${departamentoAbreviado} · ${dimension}` : dimension;
 }
 
 /** "Ver anteriores (5)" cuando hay más de las visibles. */

@@ -19,7 +19,7 @@
 //   1. salida + identidad, mismo renglón          36px
 //   2. contador fijo + píldoras monolínea         44px
 //   3. UNA caja: depto, problema, pasos, CAMPO   ~380px
-//   4. bitácora, un renglón que se abre al tocar
+//   4. bitácora: un renglón que se abre, o una línea si no hay registros
 //
 // Se eliminaron kicker, título y bajada: la persona entra desde la card del Rail
 // que ya dice "Bitácora de Acciones", así que repetían lo que acababa de tocar.
@@ -34,7 +34,7 @@
 // qué focos le tocan y con qué identidad; el cliente no filtra ni elige nada.
 // ════════════════════════════════════════════════════════════════════════════
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, ChevronDown, Info, Loader2, AlertTriangle } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
@@ -96,6 +96,7 @@ export default function ClimaBitacoraView({ campaignId, onBack }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const pillsRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
     if (!campaignId) {
@@ -135,6 +136,40 @@ export default function ClimaBitacoraView({ campaignId, onBack }: Props) {
     () => bitacoraAbreviarDepartamentos(items.map((i) => i.departmentName)),
     [items]
   );
+
+  /**
+   * El mapa está keyeado por nombre único de departamento, así que su tamaño ES la
+   * cantidad de departamentos distintos en la vista. Uno solo => la abreviatura sale
+   * de las píldoras (ver bitacoraPill).
+   */
+  const unSoloDepartamento = abreviaturas.size === 1;
+
+  /**
+   * Rueda vertical sobre la barra de píldoras => scroll horizontal.
+   *
+   * Va como listener NATIVO con `{ passive: false }` y no como `onWheel` de React:
+   * React registra `wheel` en la raíz como pasivo, y ahí `preventDefault()` no
+   * aplica. Sin él la página scrollea vertical al mismo tiempo que las píldoras se
+   * corren, que se siente roto. Solo traduce el gesto: no toca datos ni estado.
+   *
+   * Depende de `status` e `items.length` porque la barra no existe en loading, en
+   * error ni en el estado vacío: si el efecto corriera una sola vez al montar, el
+   * ref estaría en null y nunca se engancharía.
+   */
+  useEffect(() => {
+    const el = pillsRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      // Gesto ya horizontal (trackpad, shift+rueda): el navegador lo resuelve mejor.
+      if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+      // Sin desborde no hay nada que correr: devolver la rueda a la página.
+      if (el.scrollWidth <= el.clientWidth) return;
+      e.preventDefault();
+      el.scrollLeft += e.deltaY;
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, [status, items.length]);
 
   /** Aviso preventivo: alguien registró recién y no fui yo. Solo el hecho, sin instrucción. */
   const avisoReciente = useMemo(() => {
@@ -319,9 +354,25 @@ export default function ClimaBitacoraView({ campaignId, onBack }: Props) {
         <span className="shrink-0 text-[10px] font-mono uppercase tracking-wider text-slate-500 tabular-nums">
           {bitacoraCounter(activeIdx, items.length)}
         </span>
+        {/* `min-w-0` NO es cosmético: sin él este div es un hijo flex con
+            `min-width: auto`, o sea que no puede encogerse por debajo del ancho de su
+            contenido. Con 8 focos crecía hasta las 8 píldoras, nunca desbordaba, nunca
+            había scroll, y el `overflow-hidden` de la card cortaba la cuarta contra el
+            borde sin forma de llegar a las que faltaban.
+
+            El degradado del borde derecho es la señal de que la lista sigue. Va inline
+            porque Tailwind no trae utilidad de máscara y no es color: es un recorte de
+            opacidad. Queda fijo aunque se llegue al final (apagarlo pide un listener de
+            scroll; decisión de Victor 2026-08-04: no vale el estado). */}
         <div
-          className="flex gap-2 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] scroll-smooth -mx-1 px-1 py-1"
-          style={{ scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch' }}
+          ref={pillsRef}
+          className="flex-1 min-w-0 flex gap-2 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] scroll-smooth -mx-1 px-1 py-1"
+          style={{
+            scrollSnapType: 'x mandatory',
+            WebkitOverflowScrolling: 'touch',
+            maskImage: 'linear-gradient(to right, #000 calc(100% - 28px), transparent)',
+            WebkitMaskImage: 'linear-gradient(to right, #000 calc(100% - 28px), transparent)',
+          }}
         >
           {items.map((it, i) => (
             <button
@@ -339,7 +390,7 @@ export default function ClimaBitacoraView({ campaignId, onBack }: Props) {
               )}
             >
               {bitacoraPill(
-                abreviaturas.get(it.departmentName) ?? it.departmentName,
+                unSoloDepartamento ? null : (abreviaturas.get(it.departmentName) ?? it.departmentName),
                 dimensionLabel(it.category)
               )}
             </button>
@@ -402,91 +453,104 @@ export default function ClimaBitacoraView({ campaignId, onBack }: Props) {
               <span className="text-[10px] font-mono text-slate-600 tabular-nums shrink-0">
                 {draft.length}/{BITACORA_TEXT_MAX}
               </span>
-              <PrimaryButton size="sm" onClick={onRegistrar} disabled={!puedeRegistrar}>
-                {submitting ? (
-                  <span className="flex items-center gap-1.5">
-                    <Loader2 className="w-3 h-3 animate-spin" /> {BITACORA_FORM.submitting}
-                  </span>
-                ) : (
-                  BITACORA_FORM.submit
-                )}
+              {/* Único CTA de la pantalla => `lg` + glow, el tier que la skill reserva
+                  para la acción principal (focalizahr-design →
+                  references/premium-components.md:316, tabla de decisiones). Estaba en
+                  `sm`, que es el tier de acciones dentro de tablas y listas: 32px de
+                  alto, por debajo del mínimo de 44px de tap target, y se leía fantasma.
+                  Sin `fullWidth` (decisión de Victor): el contador se queda en su lugar.
+                  El spinner sale de la prop `isLoading` del propio componente, no de un
+                  Loader2 a mano (premium-components.md:344). */}
+              <PrimaryButton
+                size="lg"
+                glow
+                isLoading={submitting}
+                onClick={onRegistrar}
+                disabled={!puedeRegistrar}
+              >
+                {submitting ? BITACORA_FORM.submitting : BITACORA_FORM.submit}
               </PrimaryButton>
             </div>
           </div>
         )}
       </div>
 
-      {/* ── BLOQUE 4 — un renglón. Colapsada NO reserva altura. ── */}
+      {/* ── BLOQUE 4 — un renglón. Colapsado NO reserva altura. ──
+          Dos formas, no dos bloques: con registros es un disclosure que se abre; sin
+          registros es una línea sola. Un disclosure vacío era un renglón muerto con
+          una flecha que no llevaba a ningún lado. */}
       <div className="mt-3">
-        <button
-          onClick={() => setHistoryOpen((v) => !v)}
-          className="w-full flex items-center justify-between gap-2 py-2 text-left group"
-        >
-          <span className="text-[11px] font-light text-slate-500 group-hover:text-slate-400 transition-colors">
-            {BITACORA_HISTORY.label} · {bitacoraDisclosure(active.entriesCount)}
-          </span>
-          <ChevronDown
-            className={cn(
-              'w-4 h-4 text-slate-600 transition-transform shrink-0',
-              historyOpen ? 'rotate-180' : 'rotate-0'
-            )}
-          />
-        </button>
-
-        {historyOpen && (
-          <div className="mt-2 pb-1">
-            {active.entries.length === 0 ? (
-              <p className="text-[13px] font-light text-slate-500 leading-relaxed">
-                {BITACORA_HISTORY.empty}
-              </p>
-            ) : (
-              <div className="space-y-3">
-                <AnimatePresence initial={false}>
-                  {active.entries.map((e) => (
-                    <motion.div
-                      key={e.id}
-                      initial={{ opacity: 0, y: -6 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.2 }}
-                      className="pl-3 border-l border-slate-700/40"
-                    >
-                      <div className="flex items-baseline gap-2 flex-wrap">
-                        <span className="text-[10px] font-light text-slate-600 tabular-nums">
-                          {formatFecha(e.createdAt)}
-                        </span>
-                        {e.author && (
-                          <span className="text-[11px] font-light text-slate-300">
-                            {e.author.name}
-                          </span>
-                        )}
-                      </div>
-                      {/* Nombre y cargo, sin etiqueta de jerarquía (decisión Victor): el
-                          cargo ya dice de dónde viene la entrada. */}
-                      {e.author?.position && (
-                        <p className="text-[10px] font-light text-slate-600 leading-tight">
-                          {e.author.position}
-                        </p>
-                      )}
-                      <p className="text-[13px] font-light text-slate-300 leading-relaxed mt-1">
-                        {e.text}
-                      </p>
-                    </motion.div>
-                  ))}
-                </AnimatePresence>
-                {active.entries.length < active.entriesCount && (
-                  <GhostButton size="sm" onClick={onVerAnteriores} disabled={loadingMore}>
-                    {loadingMore ? (
-                      <span className="flex items-center gap-1.5">
-                        <Loader2 className="w-3 h-3 animate-spin" /> {BITACORA_HISTORY.loadingMore}
-                      </span>
-                    ) : (
-                      bitacoraSeeAll(active.entriesCount)
-                    )}
-                  </GhostButton>
+        {active.entriesCount === 0 ? (
+          <p className="py-2 text-[12px] font-light text-slate-500 leading-relaxed">
+            {BITACORA_HISTORY.invite}
+          </p>
+        ) : (
+          <>
+            <button
+              onClick={() => setHistoryOpen((v) => !v)}
+              className="w-full flex items-center justify-between gap-2 py-2 text-left group"
+            >
+              <span className="text-[11px] font-light text-slate-500 group-hover:text-slate-400 transition-colors">
+                {BITACORA_HISTORY.label} · {bitacoraDisclosure(active.entriesCount)}
+              </span>
+              <ChevronDown
+                className={cn(
+                  'w-4 h-4 text-slate-600 transition-transform shrink-0',
+                  historyOpen ? 'rotate-180' : 'rotate-0'
                 )}
+              />
+            </button>
+
+            {historyOpen && (
+              <div className="mt-2 pb-1">
+                <div className="space-y-3">
+                  <AnimatePresence initial={false}>
+                    {active.entries.map((e) => (
+                      <motion.div
+                        key={e.id}
+                        initial={{ opacity: 0, y: -6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="pl-3 border-l border-slate-700/40"
+                      >
+                        <div className="flex items-baseline gap-2 flex-wrap">
+                          <span className="text-[10px] font-light text-slate-600 tabular-nums">
+                            {formatFecha(e.createdAt)}
+                          </span>
+                          {e.author && (
+                            <span className="text-[11px] font-light text-slate-300">
+                              {e.author.name}
+                            </span>
+                          )}
+                        </div>
+                        {/* Nombre y cargo, sin etiqueta de jerarquía (decisión Victor): el
+                            cargo ya dice de dónde viene la entrada. */}
+                        {e.author?.position && (
+                          <p className="text-[10px] font-light text-slate-600 leading-tight">
+                            {e.author.position}
+                          </p>
+                        )}
+                        <p className="text-[13px] font-light text-slate-300 leading-relaxed mt-1">
+                          {e.text}
+                        </p>
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
+                  {active.entries.length < active.entriesCount && (
+                    <GhostButton size="sm" onClick={onVerAnteriores} disabled={loadingMore}>
+                      {loadingMore ? (
+                        <span className="flex items-center gap-1.5">
+                          <Loader2 className="w-3 h-3 animate-spin" /> {BITACORA_HISTORY.loadingMore}
+                        </span>
+                      ) : (
+                        bitacoraSeeAll(active.entriesCount)
+                      )}
+                    </GhostButton>
+                  )}
+                </div>
               </div>
             )}
-          </div>
+          </>
         )}
       </div>
     </>
