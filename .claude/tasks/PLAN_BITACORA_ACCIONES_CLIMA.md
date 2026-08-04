@@ -379,6 +379,39 @@ Entries con texto del smoke = 0
 
 ---
 
+## ✅ CERRADO — "un rol global recibe 8 items con employeeId null". NO ERA UN BUG.
+
+> **No volver a investigarlo.** Quedó explicado y verificado el 2026-08-04.
+
+**Síntoma:** `admin@corporacionenterprise.cl` (ACCOUNT_OWNER, `employeeId` NULL) recibía
+8 items en vez del estado vacío, mientras `maria@empresa.cl` recibía
+`{"items":[],"pendingCount":0}`, que es lo correcto.
+
+**Causa:** JWT viejo. La sesión tenía un token acuñado cuando un fixture de demo había
+poblado `User.employeeId`. El claim viaja **dentro** del token
+(`api/auth/user/login/route.ts:141`), así que el header `x-employee-id` seguía llegando
+con valor aunque la base ya estuviera en NULL. Cerrando sesión y volviendo a entrar, el
+token nuevo no lo lleva y la pantalla muestra el estado vacío.
+
+**El código estaba bien.** `route.ts` corta con `if (!viewerEmployeeId) return emptyData`,
+y el smoke lo cubre con el caso `4a. rol GLOBAL sin ser responsable → 200 y vacío`, que
+pasa invocando el handler real. Nunca hubo una rama que devolviera items sin identidad.
+
+### 📌 Lo que sí deja como aprendizaje para la Etapa 3
+
+`employeeId` es un claim **cacheado en el token por 7 días** (`generateJWT`,
+`expiresIn: '7d'`). Consecuencias reales para quien implemente el vínculo:
+
+- **Revocar `User.employeeId` en la base NO tiene efecto inmediato.** El usuario sigue
+  presentando el claim viejo hasta que expire o vuelva a entrar. Si alguna vez hay que
+  cortarle el acceso a alguien, la baja del vínculo no alcanza.
+- **Poblar el vínculo tampoco se ve al instante:** hay que volver a loguearse. Esto
+  aplica al fixture de review que quedó planificado.
+- Cualquier verificación de la Bitácora debe empezar por **cerrar sesión y entrar de
+  nuevo**, o se mide contra un token viejo. Fue exactamente lo que pasó acá.
+
+---
+
 ## REDISEÑO DE LAYOUT — ✅ 2026-08-04 (`e87075b`)
 
 Victor entró a la pantalla y no entendió qué tenía que hacer. El split 60/40 dejaba el

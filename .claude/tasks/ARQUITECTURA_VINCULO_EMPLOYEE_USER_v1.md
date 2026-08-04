@@ -167,6 +167,26 @@ cambiar ahí**. Queda además una línea pendiente, anotada en
 `src/lib/constants/climaSubproductos.ts`: gatear la card del Rail por `pendingCount > 0`
 (hoy daría 0 para todos y escondería la pantalla en vez de filtrarla).
 
+##### ⏳ `employeeId` es un claim cacheado 7 días — verificado en la práctica
+
+`generateJWT` firma con `expiresIn: '7d'`, así que **el vínculo viaja dentro del token**,
+no se consulta por request. Tres consecuencias que hay que tener presentes al implementar
+esta etapa:
+
+1. **Poblar `User.employeeId` no se ve hasta volver a loguearse.** Aplica al fixture de
+   review planificado más abajo.
+2. **Revocar el vínculo tampoco tiene efecto inmediato:** el usuario sigue presentando el
+   claim viejo hasta que el token expire. Si alguna vez hay que cortar un acceso, borrar
+   la columna no alcanza.
+3. **Toda verificación empieza por cerrar sesión y entrar de nuevo.** No hacerlo mide
+   contra un token viejo.
+
+Comprobado el 2026-08-04: una sesión con token acuñado cuando un fixture de demo había
+poblado `employeeId` seguía recibiendo focos de la Bitácora aunque la base ya estuviera
+en NULL. Al re-loguear, el comportamiento fue el correcto. **No era un bug del endpoint**
+(`route.ts` corta con `if (!viewerEmployeeId)`), pero costó una investigación entera y
+conviene que no le pase a nadie más.
+
 ##### 🧪 Cómo verificar la Bitácora el día que se retome
 
 Dos smokes quedaron **a propósito** en `prisma/scripts/` (untracked, contra la regla
