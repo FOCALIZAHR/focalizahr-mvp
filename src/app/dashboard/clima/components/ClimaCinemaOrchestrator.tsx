@@ -22,8 +22,10 @@ import ClimaToolbar from '@/components/clima/ClimaToolbar';
 import ClimaRail from './ClimaRail';
 import ClimaSubproductoScaffold from './ClimaSubproductoScaffold';
 import ClimaDimensionesView from './ClimaDimensionesView';
-import ClimaPlanesView from './planes/ClimaPlanesView';
-import ClimaBitacoraView from './bitacora/ClimaBitacoraView';
+// La card `planes` abre el HUB, no la vista de planes directo. El hub monta
+// después ClimaPlanesView (cápsula 1) y ClimaBitacoraView (cápsula 2), que por
+// eso ya no se importan acá.
+import ClimaPlanesHub from './planes/ClimaPlanesHub';
 import DepartmentSpotlightCard from './DepartmentSpotlightCard';
 import ClimaChapterView from './ClimaChapterView';
 import ClimaIntroSequence from './cascada/ClimaIntroSequence';
@@ -179,16 +181,8 @@ export default function ClimaCinemaOrchestrator({
           )}
 
           {showSubproducto && activeSubproducto === 'planes' && (
-            <ClimaPlanesView
+            <ClimaPlanesHub
               key="subproducto-planes"
-              campaignId={hook.selectedCampaignId}
-              onBack={hook.exitSubproducto}
-            />
-          )}
-
-          {showSubproducto && activeSubproducto === 'bitacora' && (
-            <ClimaBitacoraView
-              key="subproducto-bitacora"
               campaignId={hook.selectedCampaignId}
               onBack={hook.exitSubproducto}
             />
@@ -197,8 +191,7 @@ export default function ClimaCinemaOrchestrator({
           {showSubproducto &&
             activeSubproducto &&
             activeSubproducto !== 'dimensiones' &&
-            activeSubproducto !== 'planes' &&
-            activeSubproducto !== 'bitacora' && (
+            activeSubproducto !== 'planes' && (
               <ClimaSubproductoScaffold
                 key={`subproducto-${activeSubproducto}`}
                 subproducto={activeSubproducto}

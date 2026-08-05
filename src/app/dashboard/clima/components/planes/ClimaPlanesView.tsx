@@ -2,11 +2,17 @@
 
 // src/app/dashboard/clima/components/planes/ClimaPlanesView.tsx
 // ════════════════════════════════════════════════════════════════════════════
-// Subproducto "Planes de Acción" (5ª card del Rail, Gate 5D). Shell Cinema Mode
-// con 3 tabs internos:
+// CÁPSULA 1 del Hub de Planes de Acción (H1). Ya no la abre el Rail directo: la
+// abre `ClimaPlanesHub`, que le pasa el mismo contrato de props de siempre.
+// Shell Cinema Mode con 2 tabs internos:
 //   - departamento (Tab 1, 5D-i): portada → carrusel de 4 caminos → workspace.
 //   - persona      (Tab 2, 5D-ii): responsables con equipos en riesgo, doble CTA.
-//   - seguimiento  (Tab 3): tracking + matriz de efectividad (GROUP C, diferido).
+//
+// ⚠️ EL TAB 3 ("Seguimiento") SE RETIRÓ (decisión de Victor, 2026-08-05). Era un
+// FHREmptyState que prometía la matriz de efectividad; esa promesa ahora la
+// cumple la CÁPSULA 3 del hub, con pantalla propia. Se retiró para que haya una
+// sola puerta: un tab vacío acá y un mundo con lo mismo en el hub obligaba a
+// adivinar cuál era el de verdad. Tab 1 y Tab 2 no se tocaron.
 //
 // El shell SE CORRE (modo `bare`) cuando el usuario está dentro de un camino: ese
 // workspace trae su propio card (Split de Contexto de Categoría, clon de
@@ -18,16 +24,14 @@
 import { useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { FHREmptyState } from '@/components/ui/FHREmptyState';
 import ClimaPlanDeptTab, { type ClimaPlanDeptView } from './ClimaPlanDeptTab';
 import ClimaPlanPersonaTab, { type ClimaPlanPersonaView } from './ClimaPlanPersonaTab';
 
-type PlanesTab = 'departamento' | 'persona' | 'seguimiento';
+type PlanesTab = 'departamento' | 'persona';
 
 const TABS: { id: PlanesTab; label: string }[] = [
   { id: 'departamento', label: 'Por departamento' },
   { id: 'persona', label: 'Por persona' },
-  { id: 'seguimiento', label: 'Seguimiento' },
 ];
 
 interface ClimaPlanesViewProps {
@@ -114,17 +118,11 @@ export default function ClimaPlanesView({ campaignId, onBack }: ClimaPlanesViewP
               onViewChange={setDeptView}
               onExitToLobby={onBack}
             />
-          ) : tab === 'persona' ? (
+          ) : (
             // Fase 3: el CTA "meta" está wireado DENTRO del tab (lee el plan aprobado → monta
             // ClimaFixMetaScreen). El CTA "pdi" sigue gated (Blocker 2, sin pantalla destino).
             // onViewChange reporta la vista interna (workspace/fixmeta traen su propio chrome).
             <ClimaPlanPersonaTab campaignId={campaignId} onViewChange={setPersonaView} />
-          ) : (
-            <FHREmptyState
-              type="pending"
-              title="Seguimiento del plan"
-              description="El seguimiento y la matriz de efectividad aparecen aquí una vez que hay un plan aprobado y su próxima medición de clima cierra."
-            />
           )}
         </div>
       </div>
