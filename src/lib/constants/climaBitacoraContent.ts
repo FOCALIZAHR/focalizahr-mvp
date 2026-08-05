@@ -100,12 +100,9 @@ export const BITACORA_PORTADA = {
   /** Vuelta a la portada desde el carrusel. */
   back: 'Ver el resumen',
 
-  narrative:
-    'Tus compromisos de Clima están activos. Registra lo que hiciste con cada uno. ' +
-    'Un plan sin registro no es una intervención, es una declaración de intenciones sin evidencia.',
-  consequence:
-    'Sin bitácora documentada, el próximo ciclo de Clima medirá percepción contra azar, ' +
-    'no contra la efectividad de tu liderazgo.',
+  narrative: 'Tus compromisos de Clima están activos. Registra lo que hiciste con cada uno.',
+  /** Consecuencia, no instrucción (Regla 3 de focalizahr-narrativas). */
+  consequence: 'Un plan sin registro es una declaración de intenciones sin evidencia.',
 } as const;
 
 /**
