@@ -42,10 +42,19 @@ interface ClimaEfectividadViewProps {
    * alguien registra entre medio.
    */
   progress: ClimaPlanesProgressDTO | null;
+  /**
+   * Solo se pasa de largo hasta `Hallazgos`, que pide su propio dato. La portada
+   * NO lo recibe: no hace IO, y dárselo la invitaría a hacerlo.
+   */
+  campaignId: string | null;
   onBack: () => void;
 }
 
-export default function ClimaEfectividadView({ progress, onBack }: ClimaEfectividadViewProps) {
+export default function ClimaEfectividadView({
+  progress,
+  campaignId,
+  onBack,
+}: ClimaEfectividadViewProps) {
   const [vista, setVista] = useState<'portada' | 'hallazgos'>('portada');
 
   return (
@@ -67,7 +76,7 @@ export default function ClimaEfectividadView({ progress, onBack }: ClimaEfectivi
       {vista === 'portada' ? (
         <ClimaEfectividadPortada progress={progress} onEnter={() => setVista('hallazgos')} />
       ) : (
-        <ClimaEfectividadHallazgos />
+        <ClimaEfectividadHallazgos campaignId={campaignId} />
       )}
     </motion.div>
   );

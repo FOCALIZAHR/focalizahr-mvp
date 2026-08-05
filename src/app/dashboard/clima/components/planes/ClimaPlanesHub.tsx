@@ -127,7 +127,9 @@ export default function ClimaPlanesHub({ campaignId, onBack }: ClimaPlanesHubPro
     return <ClimaBitacoraView campaignId={campaignId} onBack={backToHub} />;
   }
   if (capsula === 'efectividad') {
-    return <ClimaEfectividadView progress={progress} onBack={backToHub} />;
+    return (
+      <ClimaEfectividadView progress={progress} campaignId={campaignId} onBack={backToHub} />
+    );
   }
 
   // ── El enrutador ──

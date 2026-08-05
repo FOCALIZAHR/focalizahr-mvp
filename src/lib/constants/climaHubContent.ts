@@ -184,6 +184,97 @@ export const HUB_BACK = 'Volver';
 // medición, y eso sería verdad aunque la pantalla estuviera terminada.
 // ─────────────────────────────────────────────────────────────────────────────
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Cobertura de registro por gerencia (H2a) — contenido de la Cápsula 3.
+//
+// Vive acá y no en un archivo propio para que TODA la copy de la cápsula tenga un
+// solo lugar: partirla dejaría la portada en un archivo y su contenido en otro.
+//
+// ⚠️ REGLA DEL PLAN MAESTRO §6, literal: "Si el jefe no escribe, eso es un dato,
+// no un error". Por eso acá no aparece "pendiente", "faltante", "incumplido" ni
+// "sin ejecutar". Una unidad sin registro se describe como lo que es —sin
+// registro— y nada más. El sistema califica la táctica, nunca a la persona (§2.6).
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const COBERTURA_TITLE = 'Cobertura de registro';
+
+/**
+ * Bajada de la sección. Dice qué se está mirando y, sobre todo, qué NO: el
+ * registro no mide si el plan funcionó — eso lo dirá la próxima medición. Sin esa
+ * aclaración, un 25% se lee como "el 75% falló", que es una conclusión que este
+ * dato no sostiene.
+ */
+export const COBERTURA_SUB =
+  'Qué unidades dejaron registro de lo que hicieron con sus focos. Es actividad, no resultado.';
+
+/** Segunda línea de cada fila: el conteo crudo. */
+export function coberturaRowCount(withAction: number, total: number): string {
+  return `${withAction} de ${total} ${total === 1 ? 'foco' : 'focos'}`;
+}
+
+/** Distintivo de la unidad que todavía no registró nada. Descriptivo, no acusatorio. */
+export const COBERTURA_TAG_SIN_REGISTRO = 'Sin registro';
+
+/** Detalle al expandir una fila. */
+export function coberturaDetalle(withAction: number, total: number): string {
+  const sin = total - withAction;
+  return `${withAction} con registro · ${sin} sin registro`;
+}
+
+/** Encabezado del drill-down. Misma palabra que usa Dimensiones. */
+export function coberturaDesglose(n: number): string {
+  return `Desglose (${n})`;
+}
+
+/** Micro-rótulo del panel de filas. Molde: `ClimaDimensionesView.tsx:282-285`. */
+export function coberturaUnidadesLabel(n: number): string {
+  return `${n} unidad${n !== 1 ? 'es' : ''} con focos`;
+}
+
+/**
+ * Las dos etapas del flujo. No son dos bloques sueltos: la segunda DEPENDE de la
+ * primera — sin registro no hay nada que cruzar contra la próxima medición, y por
+ * eso se muestran encadenadas y no una al lado de la otra.
+ */
+export const COBERTURA_ETAPA_1 = 'Lo que ya se registró';
+export const COBERTURA_ETAPA_2 = 'Lo que falta para el veredicto';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Pulso de actividad — el panel del 30%.
+//
+// El dato hero de esta columna es el TIEMPO, no el porcentaje. Razón: el
+// porcentaje global ya lo dio la portada un clic antes, y las cards de la derecha
+// dan el de cada gerencia. Los días transcurridos son lo único que no está en
+// ninguna de las dos superficies y que nadie puede inferir mirándolas — y son los
+// que le dan peso al conteo: "0 de 17" no dice lo mismo a los dos días que a los
+// noventa.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Bajada del número hero. El número va aparte, en grande. */
+export function pulsoDiasLabel(dias: number): string {
+  return `${dias === 1 ? 'día' : 'días'} desde la aprobación`;
+}
+
+/** Sin fecha de aprobación sellada (planes viejos): no se inventa un número. */
+export const PULSO_SIN_FECHA = 'Sin fecha de aprobación registrada.';
+
+/**
+ * Estado de actividad, en una línea. Describe lo que hay; no reclama lo que
+ * falta. La regla del plan §6 vale igual acá: si nadie escribió, eso es un dato.
+ *
+ * `conActividad` / `totalUnidades` son GERENCIAS (unidades de primer nivel), no
+ * focos: esta línea habla de quiénes se movieron, y el conteo de focos ya vive en
+ * cada card.
+ */
+export function pulsoActividad(conActividad: number, totalUnidades: number): string {
+  if (totalUnidades === 0) return 'Todavía no hay gerencias con focos asignados.';
+  if (conActividad === 0) return 'Sin actividad registrada en ninguna gerencia.';
+  if (conActividad === totalUnidades) {
+    return `Las ${totalUnidades} gerencias registraron actividad.`;
+  }
+  return `${conActividad} de ${totalUnidades} gerencias registraron actividad.`;
+}
+
 export const HUB_EFECTIVIDAD_PENDIENTE = {
   title: 'Sin resultados de efectividad todavía',
   description:
