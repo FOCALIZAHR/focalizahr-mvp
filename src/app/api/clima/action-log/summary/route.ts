@@ -30,7 +30,7 @@ import type { ClimaPlanesProgressDTO } from '@/types/clima-hub';
 
 /** Sin plan aprobado, sin hallazgos, o sin alcance: 0 de 0. `pct` null = no hay
  *  fracción que mostrar (nunca 0%, que se leería como "nadie registró nada"). */
-const EMPTY: ClimaPlanesProgressDTO = { withAction: 0, total: 0, pct: null };
+const EMPTY: ClimaPlanesProgressDTO = { withAction: 0, total: 0, pct: null, measured: 0 };
 
 /**
  * Departamentos que este viewer puede contar. `null` = todos (rol global).
@@ -110,7 +110,12 @@ export async function GET(request: NextRequest) {
     // hallazgo aceptado de UN plan (decenas), no un listado paginable.
     const logs = await prisma.climaActionLog.findMany({
       where: { accountId: userContext.accountId, actionPlanId: plan.id },
-      select: { triggerRef: true, departmentId: true, actionText: true },
+      select: {
+        triggerRef: true,
+        departmentId: true,
+        actionText: true,
+        impactMeasured: true,
+      },
     });
 
     const allowedDepartmentIds = await resolveAllowedDepartmentIds(userContext);
@@ -130,12 +135,19 @@ export async function GET(request: NextRequest) {
     const withAction = scoped.filter((l) => l.actionText !== null).length;
     const total = scoped.length;
 
+    // Veredicto emitido = `impactMeasured` no null. Lo escribe ActionEffectivenessService
+    // al cerrar un Seguimiento Focalizado, y solo entonces. Mientras sea 0, la Cápsula 3
+    // no tiene nada que analizar — y eso es un hecho del negocio, no un pendiente de
+    // construcción.
+    const measured = scoped.filter((l) => l.impactMeasured !== null).length;
+
     return NextResponse.json({
       success: true,
       data: {
         withAction,
         total,
         pct: Math.round((withAction / total) * 100),
+        measured,
       } satisfies ClimaPlanesProgressDTO,
     });
   } catch {

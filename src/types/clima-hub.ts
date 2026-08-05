@@ -18,6 +18,13 @@ export interface ClimaPlanesProgressDTO {
   withAction: number;
   total: number;
   pct: number | null;
+  /**
+   * Focos que YA recibieron veredicto de efectividad (`impactMeasured` no null).
+   * Es 0 hasta que cierra un Seguimiento Focalizado — el único evento que dispara
+   * `ActionEffectivenessService`. La Cápsula 3 lo usa para decir "pendiente de
+   * medición" sin hardcodear ese estado.
+   */
+  measured: number;
 }
 
 export interface ClimaPlanesProgressResponse {
