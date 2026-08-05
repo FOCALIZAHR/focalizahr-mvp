@@ -22,7 +22,7 @@ Deriva del orden de construcción del plan maestro §5. El paso 1 de ese orden
 | Gate | Nombre | Estado | Commit |
 |------|--------|--------|--------|
 | H0 | Gate 0 read-only — verificación contra código real | ✅ | _(sin código)_ |
-| H1 | Hub con las 3 cápsulas | ✅ | `7a6c771` |
+| H1 | Hub con las 3 cápsulas | ✅ | `7a6c771` + `9c5260e` |
 | H2 | Cápsula 3 — Estado A (pre-resultados, sin LLM) | ⬜ | |
 | H3 | Cápsula 3 — Estado B (post-resultados, motores) | ⬜ | |
 | H4 | Cápsula 3 — Motores avanzados + cruces de suite | ⏸️ | |
@@ -59,7 +59,27 @@ Verificación del plan maestro contra el código real. Sin código escrito.
 
 ---
 
-## H1 — Hub con las 3 cápsulas ✅ SELLADO 2026-08-05 · `7a6c771`
+## H1 — Hub con las 3 cápsulas ✅ SELLADO 2026-08-05 · `7a6c771` + `9c5260e`
+
+**Archivos finales de H1** (5 nuevos + 4 modificados):
+
+```
+NUEVOS
+  src/app/api/clima/action-log/summary/route.ts        endpoint del progreso
+  src/types/clima-hub.ts                               contratos
+  src/lib/constants/climaHubContent.ts                 copy + íconos + colores
+  src/app/dashboard/clima/components/planes/
+    ClimaPlanesHub.tsx                                 el enrutador (3 puertas)
+    ClimaEfectividadView.tsx                           máquina de estados cápsula 3
+    ClimaEfectividadPortada.tsx                        portada (pantalla)
+    ClimaEfectividadHallazgos.tsx                      contenido ← AQUÍ ESCRIBEN H2/H3
+
+MODIFICADOS
+  ClimaCinemaOrchestrator.tsx    la card `planes` monta el hub
+  climaSubproductos.ts           la Bitácora sale del Rail
+  src/types/clima.ts             `'bitacora'` sale de la union
+  ClimaPlanesView.tsx            se retira el tab 3 (excepción autorizada)
+```
 
 Objetivo: la card `planes` del Rail deja de abrir `ClimaPlanesView` directo y
 abre un hub con 3 tarjetas + barra de progreso global.
@@ -139,6 +159,87 @@ era el código:** el dev server de la otra sesión (PID 5080, puerto 3000) era
 dueño de `.next` y reescribía los chunks mientras el build los leía. La pista
 está en que `_document.js` es artefacto del **Pages Router** y todo lo tocado
 acá es App Router. Se resolvió con el puerto liberado + `.next` borrado.
+
+### Correcciones de diseño de Victor — 2026-08-05, post-revisión en pantalla
+
+H1 se vio funcionando y volvió con tres rondas de corrección. Quedan acá porque
+son **reglas de patrón**, no ajustes de esta pantalla: aplican a lo que venga.
+
+**Ronda 1 — el hub es un enrutador, no tres CTAs.**
+- Fuera los tres botones "Entrar →". Tres botones convierten un enrutador en tres
+  llamados a la acción compitiendo. La tarjeta entera es el destino.
+- La barra de progreso se fue del hub. Arriba competía con el enrutamiento y le
+  daba protagonismo a una métrica que es de UNA cápsula, no de las tres.
+- Fuera el gradiente del relleno: leía como semáforo.
+
+**Ronda 2 — clonar el molde real del sistema, no inventar uno.**
+Referencias que dio Victor: las 4 cards de priorización de Tab 1 y las cards de
+Diagnóstico/Conversación/Desarrollo de Evaluaciones. **Son la misma pieza:**
+`ClimaPathCarousel.tsx:5` declara ser clon de
+`src/components/performance/summary/SummaryHub.tsx` ("Las 3 Puertas"), que son
+literalmente tres cards en `grid-cols-1 md:grid-cols-3` — el mismo problema que
+este hub. Se clonó token por token (`SummaryHub.tsx:87-152`): `motion.button`
+`p-6 rounded-2xl bg-[#0F172A]/60 backdrop-blur-md`, `whileHover={{scale:1.02,
+y:-4}}`, Tesla line `left-4 right-4` por card, ícono `w-10 h-10 rounded-xl` con
+fondo `${color}15`, badge en el color, métrica `text-lg font-bold text-white`.
+
+**Ronda 3 — una portada es una portada.**
+`ClimaEfectividadView` tenía la portada y el contenido en un archivo. Se partió en
+tres: `ClimaEfectividadPortada` · `ClimaEfectividadHallazgos` (lo que crece con
+H2/H3) · `ClimaEfectividadView` (solo enruta). **H2 y H3 escriben en `Hallazgos`;
+la portada no se toca.**
+
+**Ronda 4 — la portada es una PANTALLA, no un encabezado.**
+En la ronda 3 quedaron apiladas: portada arriba, contenido debajo, misma pantalla.
+Mal. El patrón de portada de Clima es una **máquina de estados** donde la portada
+se REEMPLAZA:
+
+| Componente | Máquina |
+|---|---|
+| `ClimaPlanDeptTab.tsx:44` | `'portada' \| 'carrusel' \| 'path'` — monta la portada en `:325` con `onEnter` |
+| `ClimaBitacoraView.tsx:118` | `'portada' \| 'focos' \| 'cierre'` |
+| `ClimaEfectividadView` (nuevo) | `'portada' \| 'hallazgos'` |
+
+Con eso la portada RECUPERA su `PrimaryButton` (CTA "Ver hallazgos"), que en la
+ronda 3 se había quitado por creerla un encabezado. Ahora las tres portadas de
+Clima son idénticas también en eso — ya no queda ningún desvío del molde.
+
+⚠️ **Trampa heredada, documentada para H2/H3:** `vista` no se resetea nunca fuera
+del `useState` inicial. `ClimaBitacoraView.tsx:154-158` dejó escrito que un
+`setVista('portada')` dentro del load devolvía al usuario a la portada de golpe
+cada vez que algo re-ejecutaba la carga. Cuando H2 agregue su propio fetch, no
+sincronizar `vista` contra los datos.
+
+**Salida:** siempre un nivel arriba, nunca dos. Portada → hub · Hallazgos →
+portada. Es la regla de predictibilidad de la skill ("un botón atrás siempre hace
+lo mismo").
+
+**⚠️ Al partirla se detectó que la portada se había desalineado de las otras dos
+portadas de Clima.** `ClimaPortada.tsx:15` lleva escrito "mismo tratamiento que
+ClimaPlanPortada — mantener ambas alineadas", y esta era la tercera. Se realineó
+en 4 tokens: `mb-4` (no `mb-6`), `text-3xl` (no `text-2xl md:text-3xl`),
+`text-xl` (no `text-lg md:text-xl`), `max-w-3xl` (no `max-w-2xl`), más el `%`
+dentro del mismo bloque de 56px. **Las tres portadas de Clima quedan idénticas.**
+
+**Desvíos deliberados de los moldes, con su razón:**
+
+| Desvío | Molde | Por qué |
+|---|---|---|
+| Estado sin métrica en `text-slate-500` | `SummaryHub.tsx:147` usa `text-amber-400/80` | "Pendiente de medición" no es advertencia: es que no cerró la campaña. En ámbar sería semáforo. |
+| `grid`, no carrusel horizontal | — | Son tres y entran. Un carrusel de tres que no se desplaza obligaría a arrastrar en 320px para descubrir la tercera. |
+| Portada de Efectividad sin barra ni gradiente en el dato | — | El riel con relleno degradado leía como semáforo. Porcentaje solo, en blanco. |
+
+_(El desvío "portada sin CTA" que figuraba acá quedó ANULADO en la ronda 4: la
+portada es una pantalla y recuperó su `PrimaryButton`.)_
+
+`bg-[#0F172A]/60` **no** es el token prohibido de compliance (`/90` +
+`backdrop-blur-2xl` + `rounded-[20px]`): es el valor exacto de las dos
+referencias que Victor nombró. Corregirlo a otro token daría una tercera variante.
+
+**Cambio de contrato del endpoint:** se agregó `measured` (focos con
+`impactMeasured` no null) para que la tarjeta de Efectividad diga "Pendiente de
+medición" por dato y no hardcodeado. Verificado contra la base:
+terreno `{total:17, withAction:8, measured:0}` = endpoint. Smoke borrado.
 
 ### Concurrencia con la otra sesión
 
@@ -249,4 +350,33 @@ monta con el mismo contrato de props que ya expone (`campaignId`, `onBack`,
 | Fecha | Qué pasó |
 |-------|----------|
 | 2026-08-05 | Gate 0 (H0) ejecutado. 6 divergencias reportadas. Documento creado. |
-| 2026-08-05 | D2 y D3 resueltas por Victor. **H1 sellado** (`7a6c771`): hub con 3 cápsulas, barra de progreso, Bitácora fuera del Rail, tab 3 retirado. Smoke 17/17, tsc y build limpios. Sin pushear. |
+| 2026-08-05 | D2 y D3 resueltas por Victor. Hub con 3 cápsulas, Bitácora fuera del Rail, tab 3 retirado (`7a6c771`). Smoke 17/17, tsc y build limpios. |
+| 2026-08-05 | Victor revisó en pantalla → 4 rondas de corrección de diseño (`9c5260e`). **H1 SELLADO.** Ninguna fue de lógica: las cuatro eran usar el molde que ya existía en vez de uno propio. tsc y build limpios. Sin pushear. |
+
+---
+
+## Lección de las 4 rondas — leer antes de arrancar H2
+
+Ninguna de las cuatro correcciones fue un bug ni una decisión de producto. **Las
+cuatro fueron la misma:** construir una variante propia teniendo el molde del
+sistema a mano.
+
+| Ronda | Lo que hice | Lo que ya existía |
+|---|---|---|
+| 1 | Tres botones "Entrar" + barra de progreso | El hub es un enrutador; la métrica es de una cápsula |
+| 2 | Cards inventadas con hover propio | `SummaryHub.tsx` — las 3 puertas, tres cards en grid |
+| 3 | Portada y contenido en un archivo | Portada = componente propio |
+| 4 | Portada apilada como encabezado | `'portada' \| ...` — máquina de estados en Tab 1 y Bitácora |
+
+El Gate 0 de `focalizahr-design` pide nombrar el patrón ANTES de escribir. Lo
+respondí, pero nombré el molde por su categoría ("portada universal") en vez de
+abrir los archivos del propio módulo y leer cómo está resuelto ahí. **Para H2: la
+pregunta no es "qué patrón corresponde" sino "quién en Clima ya resolvió esto".**
+
+Los tres moldes verificados de este gate, para no volver a buscarlos:
+
+- **Enrutador de N puertas** → `src/components/performance/summary/SummaryHub.tsx`
+  (Tab 1 de Clima ya lo clona: `ClimaPathCarousel.tsx:5`)
+- **Portada** → `cascada/ClimaPortada.tsx` = `planes/ClimaPlanPortada.tsx`
+  (llevan escrito "mantener ambas alineadas"; ahora son tres)
+- **Máquina portada→contenido** → `ClimaPlanDeptTab.tsx:44` · `ClimaBitacoraView.tsx:118`
