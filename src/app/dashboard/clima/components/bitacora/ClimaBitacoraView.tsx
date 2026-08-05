@@ -136,10 +136,18 @@ export default function ClimaBitacoraView({ campaignId, onBack }: Props) {
         return;
       }
       const data = json.data as { items: ClimaBitacoraItemDTO[]; viewer: ClimaBitacoraViewerDTO | null };
-      setItems(data.items ?? []);
+      const nuevos = data.items ?? [];
+      setItems(nuevos);
       setViewer(data.viewer ?? null);
-      setActiveIdx(0);
-      setVista('portada');
+      // ⛔ NO se toca `vista` acá. Tenía `setVista('portada')` y cualquier cosa que
+      // re-ejecutara este load devolvía al usuario a la portada de golpe: si estaba
+      // escribiendo, perdía el contexto del foco y el borrador quedaba en un foco que
+      // ya no estaba mirando. Un refresco en segundo plano NUNCA mueve al usuario de
+      // donde está. El primer estado sigue siendo la portada por el useState inicial.
+      //
+      // El índice solo se corrige si quedó fuera de rango (la lista se achicó): si no,
+      // sigue donde estaba, por lo mismo.
+      setActiveIdx((i) => (i < nuevos.length ? i : 0));
       setStatus('ready');
     } catch {
       setStatus('error');
@@ -404,31 +412,44 @@ export default function ClimaBitacoraView({ campaignId, onBack }: Props) {
     // carrusel y aparecen recién ahí. Desde la portada la salida es el Rail, que
     // está fijo abajo: no hay que inventar una, ya se está dentro de Clima.
     return shell(
-      <div className="flex flex-col items-center text-center py-8 md:py-12 max-w-xl mx-auto">
+      /* ALTURA — medida token por token, no a ojo. Antes sumaba ~594px de card y con
+         el header de Clima, el padding del stage y el Rail colapsado se pasaba de un
+         viewport de laptop (768px), que es donde el CTA quedaba fuera.
+
+           py del bloque   96 → 48   (py-8 md:py-12 → py-4 md:py-6)
+           título h2       45 → 37   (4xl → 3xl)
+           título h3       37 → 30   (3xl → 2xl)
+           narrativa      104 → 78   (max-w-xl → 2xl: 4 líneas pasan a 3)
+           mt sueltos      64 → 44   (número, narrativa y CTA)
+                          ─────────
+           card          ~594 → ~485
+
+         El ancho mayor no es cosmético: es lo que saca una línea entera de narrativa. */
+      <div className="flex flex-col items-center text-center py-4 md:py-6 max-w-2xl mx-auto">
           {/* Título ARRIBA, número debajo como respaldo. Es el orden del molde: primero
               qué pantalla es, después el dato que la sostiene. Sin kicker: con el título
               puesto repetía lo mismo y gastaba altura. */}
-          <h2 className="text-3xl md:text-4xl font-extralight text-white tracking-tight leading-tight">
+          <h2 className="text-2xl md:text-3xl font-extralight text-white tracking-tight leading-tight">
             {BITACORA_PORTADA.titleWhite}
           </h2>
-          <h3 className="text-2xl md:text-3xl font-light tracking-tight leading-tight fhr-title-gradient">
+          <h3 className="text-xl md:text-2xl font-light tracking-tight leading-tight fhr-title-gradient">
             {BITACORA_PORTADA.titleGradient}
           </h3>
 
           {/* Número en blanco, NO cian: el cian es del CTA y no deben competir. */}
-          <p className="text-[56px] md:text-[64px] font-extralight tabular-nums text-white leading-[0.9] mt-6">
+          <p className="text-[56px] md:text-[64px] font-extralight tabular-nums text-white leading-[0.9] mt-4">
             {items.length}
           </p>
           <p className="text-sm font-light text-slate-500 mt-1">
             {bitacoraPortadaSuffix(items.length, equipos)}
           </p>
-          <p className="text-base font-light text-slate-300 leading-relaxed mt-6">
+          <p className="text-base font-light text-slate-300 leading-relaxed mt-5">
             {BITACORA_PORTADA.narrative}
           </p>
-          <p className="text-sm font-light text-slate-500 leading-relaxed mt-4">
+          <p className="text-sm font-light text-slate-500 leading-relaxed mt-3">
             {BITACORA_PORTADA.consequence}
           </p>
-          <div className="mt-8">
+          <div className="mt-6">
             <PrimaryButton
               size="md"
               icon={ArrowRight}
