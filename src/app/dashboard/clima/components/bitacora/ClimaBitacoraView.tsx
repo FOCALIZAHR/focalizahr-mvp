@@ -120,7 +120,16 @@ export default function ClimaBitacoraView({ campaignId, onBack }: Props) {
    * cuerpo pasa al carrusel. Sin scroll y sin cambiar de ruta.
    */
   const [vista, setVista] = useState<'portada' | 'focos'>('portada');
+  /** Solo móvil: los pasos se colapsan para que el campo entre en 568px de alto. */
+  const [stepsOpen, setStepsOpen] = useState(false);
   const pillsRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  /** Cierra el overlay y devuelve el cursor al campo, que es a lo que la persona vino. */
+  const cerrarHistorial = useCallback(() => {
+    setHistoryOpen(false);
+    textareaRef.current?.focus();
+  }, []);
 
   const load = useCallback(async () => {
     if (!campaignId) {
@@ -218,6 +227,19 @@ export default function ClimaBitacoraView({ campaignId, onBack }: Props) {
     // `vista` entra en las deps porque la barra NO existe en la portada: sin él, el
     // ref sería null al montar y las flechas nunca se medirían.
   }, [medirDesborde, status, items.length, vista]);
+
+  /**
+   * Escape cierra el overlay de la bitácora. Mismo patrón que el resto del sistema
+   * (`ResolvedAlertDetailModal.tsx:138-144`): listener en window mientras está abierto.
+   */
+  useEffect(() => {
+    if (!historyOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') cerrarHistorial();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [historyOpen, cerrarHistorial]);
 
   /** Corre ~80% del ancho visible: deja una píldora de contexto entre salto y salto. */
   const desplazarPildoras = useCallback((direccion: 1 | -1) => {
@@ -463,274 +485,253 @@ export default function ClimaBitacoraView({ campaignId, onBack }: Props) {
     );
   }
 
+  // ── FOCOS — UNA SOLA CAJA ────────────────────────────────────────────────
+  // Cabecera (flechas fijas + pestañas), contexto y campo comparten lienzo,
+  // separados por líneas internas. Antes eran dos cajas con dos bordes y el
+  // carrusel flotaba afuera: lo que se selecciona arriba es lo que se despliega
+  // abajo, y tiene que verse como una sola cosa.
   return shell(
     <>
       {barraSuperior}
 
-      {/* ── BLOQUE 2 — contador FIJO + píldoras monolínea ──
-          Patrón canónico de pills (page-patterns.md:107-131): whitespace-nowrap,
-          rounded-lg, scroll horizontal. El contador no scrollea, para saber cuántos
-          focos hay sin recorrer la barra. */}
-      <div className="flex items-center gap-2 mt-4 min-h-[44px]">
-        <button
-          onClick={() => setVista('portada')}
-          className="shrink-0 flex items-center gap-1 text-[10px] font-light text-slate-500 hover:text-slate-300 transition-colors"
-        >
-          <ArrowLeft className="w-3 h-3" /> {BITACORA_PORTADA.back}
-        </button>
-        <span className="shrink-0 text-[10px] font-mono uppercase tracking-wider text-slate-500 tabular-nums">
-          {bitacoraCounter(activeIdx, items.length)}
-        </span>
+      <div className="mt-4 rounded-xl border border-slate-800/60 bg-slate-950/30 overflow-hidden">
+        {/* ── CABECERA: flechas como BLOQUES FIJOS en los extremos ──
+            Antes eran botones superpuestos sobre el área de scroll y pisaban el
+            texto. Ancladas a los extremos con borde propio, el carrusel se desliza
+            en el medio y es estructuralmente imposible que se pisen.
+            Se apagan del lado sin recorrido; `invisible` reserva el ancho para que
+            la cabecera no salte. No se sacan: la rueda no funciona en este carrusel
+            y son la única forma de navegarlo con mouse. */}
+        <div className="flex items-stretch border-b border-slate-800/60">
+          <button
+            onClick={() => desplazarPildoras(-1)}
+            aria-label="Focos anteriores"
+            className={cn(
+              'hidden md:flex shrink-0 w-9 items-center justify-center border-r border-slate-800/60 bg-slate-900/40 hover:bg-slate-800 transition-colors',
+              !canLeft && 'invisible pointer-events-none'
+            )}
+          >
+            <ChevronLeft className="w-4 h-4 text-slate-300" />
+          </button>
 
-        {/* Flechas FUERA del área de scroll: son hermanas del contenedor que scrollea,
-            no absolutas encima. Antes tapaban las píldoras de los extremos; sacarlas del
-            área elimina la superposición por estructura, sin taparla con fondo sólido.
-
-            Patrón del módulo (ClimaRail.tsx:125-131), más chicas porque acá la barra mide
-            44px y no 100+. Dos diferencias deliberadas: no se revelan en hover (esconder
-            detrás de un hover la única forma de llegar a las píldoras con mouse recrea el
-            problema que vinieron a resolver), y se apagan del lado sin recorrido.
-
-            `invisible` en vez de desmontar: reservan su ancho igual, así la barra no salta
-            cuando aparecen o desaparecen. Solo en escritorio: en táctil anda el arrastre. */}
-        <button
-          onClick={() => desplazarPildoras(-1)}
-          aria-label="Focos anteriores"
-          className={cn(
-            'hidden md:flex shrink-0 w-7 h-7 items-center justify-center rounded-full bg-slate-800/90 border border-slate-700 hover:bg-slate-700 transition-colors',
-            !canLeft && 'invisible pointer-events-none'
-          )}
-        >
-          <ChevronLeft className="w-4 h-4 text-white" />
-        </button>
-
-        {/* `min-w-0` NO es cosmético: sin él este div es un hijo flex con
-            `min-width: auto`, o sea que no puede encogerse por debajo del ancho de su
-            contenido. Con 8 focos crecía hasta las 8 píldoras, nunca desbordaba, nunca
-            había scroll, y el `overflow-hidden` de la card cortaba la cuarta contra el
-            borde sin forma de llegar a las que faltaban.
-
-            El degradado del borde derecho es la señal de que la lista sigue. Va inline
-            porque Tailwind no trae utilidad de máscara y no es color: es un recorte de
-            opacidad. Queda fijo aunque se llegue al final (apagarlo pide un listener de
-            scroll; decisión de Victor 2026-08-04: no vale el estado). */}
           <div
             ref={pillsRef}
-            className="flex-1 min-w-0 flex gap-2 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] scroll-smooth -mx-1 px-1 py-1"
-            style={{
-              scrollSnapType: 'x proximity',
-              WebkitOverflowScrolling: 'touch',
-              maskImage: 'linear-gradient(to right, #000 calc(100% - 28px), transparent)',
-              WebkitMaskImage: 'linear-gradient(to right, #000 calc(100% - 28px), transparent)',
-            }}
+            className="flex-1 min-w-0 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] scroll-smooth"
+            style={{ scrollSnapType: 'x proximity', WebkitOverflowScrolling: 'touch' }}
           >
-          {items.map((it, i) => (
-            <button
-              key={it.logId}
-              onClick={() => {
-                setActiveIdx(i);
-                setHistoryOpen(false);
-              }}
-              style={{ scrollSnapAlign: 'start' }}
-              /* Base: patrón de pills de la skill (page-patterns.md:107-131).
-                 DOS DIVERGENCIAS deliberadas sobre ese patrón:
-                 1. Glow en la activa. La skill no define glow para pills (solo para
-                    Tesla line y botones, premium-components.md). Dentro de paleta.
-                 2. Hover marcado. La skill llega a `hover:border-slate-600`, que sobre
-                    fondo oscuro no se percibe: las inactivas se leían como etiquetas
-                    deshabilitadas.
-
-                 Los valores están CALIBRADOS para que el salto se vea. Un intento previo
-                 usó `bg-slate-800/60 → bg-slate-800`, `border-cyan-500/30` y
-                 `text-slate-300 → white`: técnicamente aplicado, visualmente
-                 imperceptible. El fondo cambia de familia (800 → 700), el borde va a
-                 cyan-400/60 en vez de cyan-500/30, y `transition-all` en lugar de
-                 `transition-colors` para que el glow acompañe. */
-              className={cn(
-                'shrink-0 px-3 py-1.5 rounded-lg text-[12px] font-light whitespace-nowrap transition-all border',
-                i === activeIdx
-                  ? 'bg-cyan-500/20 text-cyan-300 border-cyan-400/60 shadow-[0_0_16px_rgba(34,211,238,0.3)]'
-                  : 'bg-slate-800/40 text-slate-300 border-slate-600 hover:bg-slate-700 hover:text-white hover:border-cyan-400/60 hover:shadow-[0_0_10px_rgba(34,211,238,0.15)]'
-              )}
-            >
-              {bitacoraPill(
-                unSoloDepartamento ? null : (abreviaturas.get(it.departmentName) ?? it.departmentName),
-                dimensionLabel(it.category)
-              )}
-            </button>
-          ))}
-        </div>
-
-        {/* Hermana DERECHA del contenedor que scrollea. Al mover las flechas fuera del
-            área de scroll se había perdido esta mitad: quedaba solo la izquierda, que en
-            la posición inicial no tiene recorrido, y al tocarla se apagaba sola. */}
-        <button
-          onClick={() => desplazarPildoras(1)}
-          aria-label="Focos siguientes"
-          className={cn(
-            'hidden md:flex shrink-0 w-7 h-7 items-center justify-center rounded-full bg-slate-800/90 border border-slate-700 hover:bg-slate-700 transition-colors',
-            !canRight && 'invisible pointer-events-none'
-          )}
-        >
-          <ChevronRight className="w-4 h-4 text-white" />
-        </button>
-      </div>
-
-      {/* ── BLOQUE 3 — UNA caja: contexto y acción juntos ── */}
-      <div className="mt-4 rounded-xl border border-slate-800/60 bg-slate-950/30 p-4 md:p-5">
-        <p className="text-[10px] uppercase tracking-widest text-slate-500 mb-2">
-          {active.departmentName}
-        </p>
-
-        <p className="text-[15px] text-slate-200 font-light leading-[1.6]">{active.narrative}</p>
-
-        {active.steps.length > 0 && (
-          <div className="mt-3">
-            <p className="text-[11px] font-light text-slate-500 mb-1">{BITACORA_PLAN.stepsLabel}</p>
-            <ul className="space-y-1 pl-4">
-              {active.steps.map((s, i) => (
-                <li key={i} className="text-[12px] text-slate-500 font-light leading-relaxed list-disc">
-                  {s}
-                </li>
+            {/* Riel + pestañas: patrón de Performance (MomentContent.tsx:162-180),
+                clonado con fidelidad. Activa cian sólida con texto oscuro; inactivas
+                TRANSPARENTES sobre el riel, que es lo que da la sensación de sólido.
+                No se inventa una variante con fondo propio por pestaña: esa no
+                existe en el sistema. */}
+            <div className="flex items-center gap-1 bg-slate-800/50 rounded-xl p-1 m-2 w-max">
+              {items.map((it, i) => (
+                <button
+                  key={it.logId}
+                  onClick={() => {
+                    setActiveIdx(i);
+                    setHistoryOpen(false);
+                  }}
+                  style={{ scrollSnapAlign: 'start' }}
+                  className={cn(
+                    'px-4 py-2 rounded-lg text-xs font-medium transition-all whitespace-nowrap',
+                    i === activeIdx ? 'bg-cyan-500 text-slate-900' : 'text-slate-400 hover:text-white'
+                  )}
+                >
+                  {bitacoraPill(
+                    unSoloDepartamento ? null : (abreviaturas.get(it.departmentName) ?? it.departmentName),
+                    dimensionLabel(it.category)
+                  )}
+                </button>
               ))}
-            </ul>
-          </div>
-        )}
-
-        {active.ceoNotes && (
-          <p className="text-[12px] font-light text-slate-400 mt-3 pl-3 border-l border-slate-700/40">
-            <span className="text-slate-500">{BITACORA_PLAN.notesLabel}: </span>
-            {active.ceoNotes}
-          </p>
-        )}
-
-        {avisoReciente && (
-          <div className="flex items-start gap-2 mt-3 rounded-lg border border-slate-700/30 bg-slate-800/20 px-3 py-2">
-            <Info className="w-3.5 h-3.5 text-slate-500 shrink-0 mt-0.5" strokeWidth={1.5} />
-            <p className="text-[12px] font-light text-slate-400 leading-relaxed">{avisoReciente}</p>
-          </div>
-        )}
-
-        {/* El campo, dentro de la misma caja que el contexto que lo justifica.
-            Gate por canWrite: el POST revalida por su cuenta, así que sin permiso no
-            se pinta un campo que iba a devolver 403. */}
-        {active.canWrite && (
-          <div className="mt-4">
-            <textarea
-              value={draft}
-              onChange={(e) =>
-                setDrafts((p) => ({ ...p, [active.logId]: e.target.value.slice(0, BITACORA_TEXT_MAX) }))
-              }
-              disabled={submitting}
-              rows={3}
-              maxLength={BITACORA_TEXT_MAX}
-              placeholder={BITACORA_FORM.placeholder}
-              className="w-full rounded-lg border border-slate-700/50 bg-slate-900/60 px-3 py-2.5 text-[14px] font-light text-slate-200 placeholder:text-slate-600 leading-relaxed resize-none focus:outline-none focus:border-cyan-500/50 transition-colors disabled:opacity-50"
-            />
-            <div className="flex items-center justify-between gap-3 mt-2">
-              <span className="text-[10px] font-mono text-slate-600 tabular-nums shrink-0">
-                {draft.length}/{BITACORA_TEXT_MAX}
-              </span>
-              {/* Único CTA de la pantalla => `lg` + glow, el tier que la skill reserva
-                  para la acción principal (focalizahr-design →
-                  references/premium-components.md:316, tabla de decisiones). Estaba en
-                  `sm`, que es el tier de acciones dentro de tablas y listas: 32px de
-                  alto, por debajo del mínimo de 44px de tap target, y se leía fantasma.
-                  Sin `fullWidth` (decisión de Victor): el contador se queda en su lugar.
-                  El spinner sale de la prop `isLoading` del propio componente, no de un
-                  Loader2 a mano (premium-components.md:344). */}
-              <PrimaryButton
-                size="lg"
-                glow
-                isLoading={submitting}
-                onClick={onRegistrar}
-                disabled={!puedeRegistrar}
-              >
-                {submitting ? BITACORA_FORM.submitting : BITACORA_FORM.submit}
-              </PrimaryButton>
             </div>
           </div>
-        )}
-      </div>
 
-      {/* ── BLOQUE 4 — un renglón. Colapsado NO reserva altura. ──
-          Dos formas, no dos bloques: con registros es un disclosure que se abre; sin
-          registros es una línea sola. Un disclosure vacío era un renglón muerto con
-          una flecha que no llevaba a ningún lado. */}
-      <div className="mt-3">
-        {active.entriesCount === 0 ? (
-          <p className="py-2 text-[12px] font-light text-slate-500 leading-relaxed">
-            {BITACORA_HISTORY.invite}
-          </p>
-        ) : (
-          <>
-            <button
-              onClick={() => setHistoryOpen((v) => !v)}
-              className="w-full flex items-center justify-between gap-2 py-2 text-left group"
-            >
-              <span className="text-[11px] font-light text-slate-500 group-hover:text-slate-400 transition-colors">
-                {BITACORA_HISTORY.label} · {bitacoraDisclosure(active.entriesCount)}
-              </span>
-              <ChevronDown
-                className={cn(
-                  'w-4 h-4 text-slate-600 transition-transform shrink-0',
-                  historyOpen ? 'rotate-180' : 'rotate-0'
-                )}
-              />
-            </button>
+          <button
+            onClick={() => desplazarPildoras(1)}
+            aria-label="Focos siguientes"
+            className={cn(
+              'hidden md:flex shrink-0 w-9 items-center justify-center border-l border-slate-800/60 bg-slate-900/40 hover:bg-slate-800 transition-colors',
+              !canRight && 'invisible pointer-events-none'
+            )}
+          >
+            <ChevronRight className="w-4 h-4 text-slate-300" />
+          </button>
+        </div>
 
-            {historyOpen && (
-              <div className="mt-2 pb-1">
-                <div className="space-y-3">
-                  <AnimatePresence initial={false}>
-                    {active.entries.map((e) => (
-                      <motion.div
-                        key={e.id}
-                        initial={{ opacity: 0, y: -6 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.2 }}
-                        className="pl-3 border-l border-slate-700/40"
-                      >
-                        <div className="flex items-baseline gap-2 flex-wrap">
-                          <span className="text-[10px] font-light text-slate-600 tabular-nums">
-                            {formatFecha(e.createdAt)}
-                          </span>
-                          {e.author && (
-                            <span className="text-[11px] font-light text-slate-300">
-                              {e.author.name}
-                            </span>
-                          )}
-                        </div>
-                        {/* Nombre y cargo, sin etiqueta de jerarquía (decisión Victor): el
-                            cargo ya dice de dónde viene la entrada. */}
-                        {e.author?.position && (
-                          <p className="text-[10px] font-light text-slate-600 leading-tight">
-                            {e.author.position}
-                          </p>
-                        )}
-                        <p className="text-[13px] font-light text-slate-300 leading-relaxed mt-1">
-                          {e.text}
-                        </p>
-                      </motion.div>
-                    ))}
-                  </AnimatePresence>
-                  {active.entries.length < active.entriesCount && (
-                    <GhostButton size="sm" onClick={onVerAnteriores} disabled={loadingMore}>
-                      {loadingMore ? (
-                        <span className="flex items-center gap-1.5">
-                          <Loader2 className="w-3 h-3 animate-spin" /> {BITACORA_HISTORY.loadingMore}
-                        </span>
-                      ) : (
-                        bitacoraSeeAll(active.entriesCount)
-                      )}
-                    </GhostButton>
-                  )}
-                </div>
+        {/* `relative` acota el overlay de la bitácora a contexto + campo: la
+            cabecera queda visible detrás, así no se pierde en qué foco se está. */}
+        <div className="relative">
+          {/* ── CONTEXTO ──
+              SIN el nombre del departamento: la pestaña activa ya lo dice, y antes
+              aparecía dos veces. */}
+          <div className="px-4 py-3 md:px-5 md:py-4 border-b border-slate-800/60">
+            <div className="flex items-start justify-between gap-3">
+              <p className="text-[15px] text-slate-200 font-light leading-[1.6]">
+                {active.narrative}
+              </p>
+              {/* Acceso a la bitácora. Si el foco no tiene registros, NO EXISTE. */}
+              {active.entriesCount > 0 && (
+                <button
+                  onClick={() => setHistoryOpen(true)}
+                  className="shrink-0 px-2.5 py-1 rounded-md text-[11px] font-medium bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
+                >
+                  {bitacoraDisclosure(active.entriesCount)}
+                </button>
+              )}
+            </div>
+
+            {active.steps.length > 0 && (
+              <div className="mt-3">
+                {/* En móvil los pasos se colapsan: con el texto real del diccionario
+                    y dos pasos, el campo quedaba fuera de un viewport de 568px. En
+                    escritorio quedan visibles. El problema se ve completo siempre. */}
+                <button
+                  onClick={() => setStepsOpen((v) => !v)}
+                  className="md:hidden flex items-center gap-1 text-[11px] font-light text-slate-500 hover:text-slate-300 transition-colors"
+                >
+                  {BITACORA_PLAN.stepsLabel}
+                  <ChevronDown
+                    className={cn('w-3 h-3 transition-transform', stepsOpen ? 'rotate-180' : '')}
+                  />
+                </button>
+                <p className="hidden md:block text-[11px] font-light text-slate-500 mb-1">
+                  {BITACORA_PLAN.stepsLabel}
+                </p>
+                <ul className={cn('space-y-1 pl-4 mt-1', !stepsOpen && 'hidden md:block')}>
+                  {active.steps.map((s, i) => (
+                    <li key={i} className="text-[12px] text-slate-500 font-light leading-relaxed list-disc">
+                      {s}
+                    </li>
+                  ))}
+                </ul>
               </div>
             )}
-          </>
-        )}
+
+            {active.ceoNotes && (
+              <p className="text-[12px] font-light text-slate-400 mt-3 pl-3 border-l border-slate-700/40">
+                <span className="text-slate-500">{BITACORA_PLAN.notesLabel}: </span>
+                {active.ceoNotes}
+              </p>
+            )}
+
+            {avisoReciente && (
+              <div className="flex items-start gap-2 mt-3 rounded-lg border border-slate-700/30 bg-slate-800/20 px-3 py-2">
+                <Info className="w-3.5 h-3.5 text-slate-500 shrink-0 mt-0.5" strokeWidth={1.5} />
+                <p className="text-[12px] font-light text-slate-400 leading-relaxed">{avisoReciente}</p>
+              </div>
+            )}
+          </div>
+
+          {/* ── EL CAMPO ──
+              Gate por canWrite: el POST revalida por su cuenta, así que sin permiso
+              no se pinta un campo que iba a devolver 403. */}
+          {active.canWrite && (
+            <div className="px-4 py-3 md:px-5 md:py-4">
+              <textarea
+                ref={textareaRef}
+                value={draft}
+                onChange={(e) =>
+                  setDrafts((p) => ({ ...p, [active.logId]: e.target.value.slice(0, BITACORA_TEXT_MAX) }))
+                }
+                disabled={submitting}
+                rows={3}
+                maxLength={BITACORA_TEXT_MAX}
+                placeholder={BITACORA_FORM.placeholder}
+                className="w-full rounded-lg border border-slate-700/50 bg-slate-900/60 px-3 py-2 text-[14px] font-light text-slate-200 placeholder:text-slate-600 leading-relaxed resize-none focus:outline-none focus:border-cyan-500/50 transition-colors disabled:opacity-50"
+              />
+              <div className="flex items-center justify-between gap-3 mt-2">
+                <span className="text-[10px] font-mono text-slate-600 tabular-nums shrink-0">
+                  {draft.length}/{BITACORA_TEXT_MAX}
+                </span>
+                <PrimaryButton size="sm" onClick={onRegistrar} disabled={!puedeRegistrar}>
+                  {submitting ? (
+                    <span className="flex items-center gap-1.5">
+                      <Loader2 className="w-3 h-3 animate-spin" /> {BITACORA_FORM.submitting}
+                    </span>
+                  ) : (
+                    BITACORA_FORM.submit
+                  )}
+                </PrimaryButton>
+              </div>
+            </div>
+          )}
+
+          {/* ── OVERLAY DE LA BITÁCORA ──
+              Contenido DENTRO de la card, cubriendo contexto y campo. Cierra con
+              clic fuera del panel o con Escape, y devuelve el cursor al campo.
+
+              ⚠️ Construido acotado a ESTA pantalla porque el sistema NO tiene un
+              overlay contextual: lo que hay son modales de pantalla completa
+              (FocalizaIntelligenceModal.tsx:194-204,
+              ResolvedAlertDetailModal.tsx:138-144) y el Dialog de Radix. Si otro
+              módulo necesita este patrón, se EXTRAE a components/ui en vez de
+              clonarlo acá. */}
+          <AnimatePresence>
+            {historyOpen && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.15 }}
+                onClick={cerrarHistorial}
+                className="absolute inset-0 z-20 bg-slate-950/80 backdrop-blur-sm flex items-start justify-center p-3 overflow-y-auto"
+              >
+                <motion.div
+                  initial={{ y: 8 }}
+                  animate={{ y: 0 }}
+                  onClick={(e) => e.stopPropagation()}
+                  className="w-full rounded-lg border border-slate-700/60 bg-slate-900 p-4"
+                >
+                  <div className="flex items-center justify-between gap-3 mb-3">
+                    <p className="text-[11px] font-medium uppercase tracking-wider text-slate-400">
+                      {BITACORA_HISTORY.label}
+                    </p>
+                    <button
+                      onClick={cerrarHistorial}
+                      className="text-[11px] font-light text-slate-500 hover:text-white transition-colors"
+                    >
+                      {BITACORA_HISTORY.close}
+                    </button>
+                  </div>
+
+                  {active.entries.length === 0 ? (
+                    <p className="text-[13px] font-light text-slate-400 leading-relaxed">
+                      {BITACORA_HISTORY.invite}
+                    </p>
+                  ) : (
+                    <div className="space-y-3">
+                      {active.entries.map((e) => (
+                        <div key={e.id} className="rounded-md bg-slate-800/60 px-3 py-2.5">
+                          {/* El texto es el protagonista; la firma va debajo, secundaria. */}
+                          <p className="text-[13px] text-slate-100 leading-relaxed">{e.text}</p>
+                          <p className="text-[10px] text-slate-400 mt-1.5">
+                            {formatFecha(e.createdAt)}
+                            {e.author && ` · ${e.author.name}`}
+                            {e.author?.position && ` · ${e.author.position}`}
+                          </p>
+                        </div>
+                      ))}
+                      {active.entries.length < active.entriesCount && (
+                        <GhostButton size="sm" onClick={onVerAnteriores} disabled={loadingMore}>
+                          {loadingMore ? (
+                            <span className="flex items-center gap-1.5">
+                              <Loader2 className="w-3 h-3 animate-spin" /> {BITACORA_HISTORY.loadingMore}
+                            </span>
+                          ) : (
+                            bitacoraSeeAll(active.entriesCount)
+                          )}
+                        </GhostButton>
+                      )}
+                    </div>
+                  )}
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
       </div>
     </>
   );
 }
+

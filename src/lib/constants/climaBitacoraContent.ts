@@ -126,17 +126,16 @@ export const BITACORA_FORM = {
 } as const;
 
 export const BITACORA_HISTORY = {
-  /** Un renglón al final. Acota a ESTE foco: la bitácora es por hallazgo, no global. */
+  /** Título del overlay. Acota a ESTE foco: la bitácora es por hallazgo, no global. */
   label: 'Bitácora de este foco',
+  close: 'Cerrar',
 
   /**
-   * Sin registros NO va un disclosure: desplegar la nada es un renglón muerto con
-   * una flecha que no lleva a ningún lado. Va esta línea sola, en su lugar.
+   * Se muestra DENTRO del overlay cuando el foco no tiene registros. Fuera del
+   * overlay no hay nada: si no hay registros, el acceso ni siquiera existe.
    *
-   * Dice para qué sirve el bloque y nada más. No culpabiliza (no menciona que no
-   * hay registros), no explica cómo se evalúa después, no pone plazo ni instrucción
-   * (Regla 3). Tampoco promete que algo se "abre" o "desbloquea": el bloque ya está
-   * ahí, lo único que falta es texto.
+   * Dice para qué sirve y nada más. No culpabiliza, no explica cómo se evalúa
+   * después, no pone plazo ni instrucción (Regla 3).
    */
   invite: 'Aquí queda lo que registres sobre este foco.',
 
