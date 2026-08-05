@@ -19,24 +19,26 @@
 // (SKILL.md Gate 1). Molde CompensationPortada, NO el PATRÓN 5 de
 // page-patterns.md:211-270, que trae caja de misión, gauge y grilla.
 //
-// FOCOS (segundo estado): cuatro bloques, sin scroll. Antes ocupaba tres pantallas
-// de alto, once bloques apilados y dos scrolls para llegar a lo único que la
-// persona vino a hacer.
+// FOCOS (segundo estado): UN SOLO LIENZO. Antes ocupaba tres pantallas de alto,
+// nueve bloques apilados, dos cajas separadas y doble scroll para llegar a lo único
+// que la persona vino a hacer.
 //
-//   1. rótulo + salida + identidad                36px
-//   2. contador fijo + píldoras monolínea         44px
-//   3. UNA caja: depto, problema, pasos, CAMPO   ~380px
-//   4. bitácora: un renglón que se abre, o una línea si no hay registros
+//   rótulo + salida + identidad
+//   ┌ caja única ────────────────────────────────────┐
+//   │ [◀] riel de pestañas             [▶]           │  cabecera
+//   │ problema                      [ 2 registros ]  │  contexto
+//   │ Pasos acordados: (colapsados en móvil)         │
+//   │ campo + contador + registrar                   │  acción
+//   └────────────────────────────────────────────────┘
 //
 // El rótulo de pantalla y el título de la portada dicen lo MISMO que la card del
 // Rail por la que se entra. Un nombre distinto para la misma superficie obliga a
 // reaprender la navegación. La persona entra cada varios meses, por un
 // recordatorio, y tiene un minuto.
 //
-// Píldoras: patrón canónico de la skill (focalizahr-design →
-// references/page-patterns.md:107-131, PATRÓN 2), NO el carrusel de cards de
-// ClimaRail que se había clonado por error. Monolínea, whitespace-nowrap, 4
-// visibles más scroll horizontal.
+// Pestañas: patrón de Performance (MomentContent.tsx:162-180), riel con activa cian
+// sólida. NO el carrusel de cards de ClimaRail ni las pills de
+// page-patterns.md:107-131, que fueron dos pasos intermedios ya superados.
 //
 // ÚNICA fuente de datos: GET /api/clima/action-log?scope=mine. El servidor decide
 // qué focos le tocan y con qué identidad; el cliente no filtra ni elige nada.
@@ -50,12 +52,9 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  Info,
   Loader2,
   AlertTriangle,
 } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
-import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { PrimaryButton, GhostButton } from '@/components/ui/PremiumButton';
 import { FHREmptyState } from '@/components/ui/FHREmptyState';
@@ -69,14 +68,12 @@ import {
   BITACORA_HISTORY,
   BITACORA_TOAST,
   BITACORA_TEXT_MAX,
-  BITACORA_RECENT_HOURS,
   bitacoraCounter,
   bitacoraPortadaSuffix,
   bitacoraPill,
   bitacoraAbreviarDepartamentos,
   bitacoraSeeAll,
   bitacoraDisclosure,
-  bitacoraRecentNotice,
 } from '@/lib/constants/climaBitacoraContent';
 import type {
   ClimaBitacoraEntryDTO,
@@ -89,18 +86,10 @@ interface Props {
   onBack: () => void;
 }
 
-const HOUR_MS = 60 * 60 * 1000;
-
 function formatFecha(iso: string): string {
   const d = new Date(iso);
   if (isNaN(d.getTime())) return '';
   return new Intl.DateTimeFormat('es-CL', { day: 'numeric', month: 'short' }).format(d);
-}
-
-function haceCuanto(iso: string): string {
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return '';
-  return formatDistanceToNow(d, { locale: es });
 }
 
 export default function ClimaBitacoraView({ campaignId, onBack }: Props) {
@@ -179,12 +168,6 @@ export default function ClimaBitacoraView({ campaignId, onBack }: Props) {
     [items]
   );
 
-  /**
-   * El mapa está keyeado por nombre único de departamento, así que su tamaño ES la
-   * cantidad de departamentos distintos en la vista. Uno solo => la abreviatura sale
-   * de las píldoras (ver bitacoraPill).
-   */
-  const unSoloDepartamento = abreviaturas.size === 1;
 
   /**
    * Flechas del carrusel. Reemplazan al listener de rueda, que se intentó dos veces y
@@ -247,15 +230,6 @@ export default function ClimaBitacoraView({ campaignId, onBack }: Props) {
     if (!el) return;
     el.scrollBy({ left: direccion * Math.max(el.clientWidth * 0.8, 120), behavior: 'smooth' });
   }, []);
-
-  /** Aviso preventivo: alguien registró recién y no fui yo. Solo el hecho, sin instrucción. */
-  const avisoReciente = useMemo(() => {
-    const ultima = active?.entries?.[0];
-    if (!ultima?.author) return null;
-    const t = new Date(ultima.createdAt).getTime();
-    if (isNaN(t) || Date.now() - t > BITACORA_RECENT_HOURS * HOUR_MS) return null;
-    return bitacoraRecentNotice(ultima.author.name, haceCuanto(ultima.createdAt));
-  }, [active]);
 
   /** Relee las entradas de UN foco desde el servidor (traen autor resuelto). */
   const refrescarEntradas = useCallback(async (logId: string) => {
@@ -538,8 +512,16 @@ export default function ClimaBitacoraView({ campaignId, onBack }: Props) {
                     i === activeIdx ? 'bg-cyan-500 text-slate-900' : 'text-slate-400 hover:text-white'
                   )}
                 >
+                  {/* El departamento se muestra solo cuando CAMBIA respecto de la
+                      pestaña anterior. Los items vienen agrupados por departamento
+                      desde el servidor, así que aparece una vez al abrir cada grupo.
+                      Repetirlo en todas no distinguía nada: con 6 focos de Atención y
+                      2 de Comercial, seis pestañas empezaban igual y lo único distinto
+                      (la dimensión) quedaba corrido a la derecha. */}
                   {bitacoraPill(
-                    unSoloDepartamento ? null : (abreviaturas.get(it.departmentName) ?? it.departmentName),
+                    i === 0 || items[i - 1].departmentName !== it.departmentName
+                      ? (abreviaturas.get(it.departmentName) ?? it.departmentName)
+                      : null,
                     dimensionLabel(it.category)
                   )}
                 </button>
@@ -570,11 +552,15 @@ export default function ClimaBitacoraView({ campaignId, onBack }: Props) {
               <p className="text-[15px] text-slate-200 font-light leading-[1.6]">
                 {active.narrative}
               </p>
-              {/* Acceso a la bitácora. Si el foco no tiene registros, NO EXISTE. */}
+              {/* Acceso a la bitácora. Si el foco no tiene registros, NO EXISTE.
+                  Fondo sólido, texto blanco y borde definido: es el corazón de la
+                  pantalla y estaba gris sobre gris, a dos centímetros de una pestaña
+                  cian sólida. No va en cian para no competir con el botón de
+                  registrar, pero tampoco puede ser lo menos visible de la caja. */}
               {active.entriesCount > 0 && (
                 <button
                   onClick={() => setHistoryOpen(true)}
-                  className="shrink-0 px-2.5 py-1 rounded-md text-[11px] font-medium bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
+                  className="shrink-0 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-slate-700 text-white border border-slate-500 hover:bg-slate-600 hover:border-slate-400 transition-colors"
                 >
                   {bitacoraDisclosure(active.entriesCount)}
                 </button>
@@ -615,12 +601,9 @@ export default function ClimaBitacoraView({ campaignId, onBack }: Props) {
               </p>
             )}
 
-            {avisoReciente && (
-              <div className="flex items-start gap-2 mt-3 rounded-lg border border-slate-700/30 bg-slate-800/20 px-3 py-2">
-                <Info className="w-3.5 h-3.5 text-slate-500 shrink-0 mt-0.5" strokeWidth={1.5} />
-                <p className="text-[12px] font-light text-slate-400 leading-relaxed">{avisoReciente}</p>
-              </div>
-            )}
+            {/* SIN aviso de registro reciente. Decía "Fulano registró hace 3 horas"
+                justo al lado del botón "2 registros", que dice lo mismo y además
+                lleva a leerlo. Una línea gastada en repetir al vecino. */}
           </div>
 
           {/* ── EL CAMPO ──

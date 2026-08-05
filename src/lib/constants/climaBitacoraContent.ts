@@ -25,9 +25,6 @@ export const BITACORA_TEXT_MAX = 200;
 /** Entradas visibles antes de "Ver anteriores". Espeja ENTRIES_PREVIEW del endpoint. */
 export const BITACORA_ENTRIES_PREVIEW = 3;
 
-/** Ventana del aviso de registro reciente, en horas. */
-export const BITACORA_RECENT_HOURS = 24;
-
 export const BITACORA_SCREEN = {
   /** Salida al lobby de Clima. Nombra el destino, no la operación. */
   back: 'Volver a Clima',
@@ -209,16 +206,16 @@ export function bitacoraAbreviarDepartamentos(nombres: string[]): Map<string, st
 }
 
 /**
- * Etiqueta de la píldora: `COMERCIAL · Liderazgo`.
+ * Etiqueta de la pestaña: `COMERCIAL · Liderazgo`, o solo `Liderazgo`.
  *
- * `departamentoAbreviado === null` cuando TODOS los focos de la vista son del mismo
- * departamento: ahí la abreviatura no distingue nada y se come media píldora. Con
- * seis focos de Atención a Clientes se leía `ATENCIÓN · Autonomía`,
- * `ATENCIÓN · Crecimiento`, `ATENCIÓN · Desarrollo`: la palabra que se repite ocupa
- * el lugar de la única que separa una píldora de la otra. El nombre del departamento
- * ya aparece una vez, dentro de la caja, que es donde corresponde.
+ * `departamentoAbreviado === null` cuando el departamento es el MISMO que el de la
+ * pestaña anterior. Los focos vienen agrupados por departamento desde el servidor,
+ * así que el nombre aparece una vez al abrir cada grupo y no se repite dentro.
  *
- * Con dos departamentos o más la abreviatura vuelve, porque ahí sí distingue.
+ * La regla anterior lo ocultaba solo si TODOS los focos eran del mismo departamento,
+ * y con 6 de Atención a Clientes y 2 de Comercial no se activaba nunca: seis
+ * pestañas empezaban con `ATENCIÓN` y lo único que las distinguía, la dimensión,
+ * quedaba corrido a la derecha. Lo que hay que repetir es lo que cambia.
  */
 export function bitacoraPill(departamentoAbreviado: string | null, dimension: string): string {
   return departamentoAbreviado ? `${departamentoAbreviado} · ${dimension}` : dimension;
@@ -229,16 +226,14 @@ export function bitacoraSeeAll(total: number): string {
   return `Ver anteriores (${total})`;
 }
 
-/** Cola del renglón de la bitácora: `Bitácora de este foco · sin registros`. */
+/**
+ * Etiqueta del acceso a la bitácora: `2 registros`. El botón solo existe cuando hay
+ * al menos uno, así que el caso cero solo aparece dentro del overlay.
+ *
+ * El aviso de "Fulano registró hace 3 horas" que vivía al lado se ELIMINÓ: decía lo
+ * mismo que este botón, que además lleva a leerlo.
+ */
 export function bitacoraDisclosure(total: number): string {
   if (total === 0) return 'sin registros';
   return total === 1 ? '1 registro' : `${total} registros`;
-}
-
-/**
- * Aviso de registro reciente. Dice el HECHO, sin instrucción (Regla 3).
- * `hace` ya viene formateado ("3 horas", "40 minutos").
- */
-export function bitacoraRecentNotice(nombre: string, hace: string): string {
-  return `${nombre} registró hace ${hace}.`;
 }
