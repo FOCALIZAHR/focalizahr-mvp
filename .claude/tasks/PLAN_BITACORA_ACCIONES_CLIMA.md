@@ -1,5 +1,58 @@
 # PLAN — Bitácora de Acciones de Clima
 
+## 🔒 ESTADO FINAL — GATE SELLADO 2026-08-05
+
+**Construida, probada y sellada. NO alcanzable todavía.**
+
+La pantalla existe, el endpoint está verificado contra datos reales y el flujo completo
+se revisó en navegador con un fixture temporal. Pero **le devuelve estado vacío a todos
+los usuarios**: `User.employeeId` está en NULL en los 26 usuarios de la base, y sin esa
+identidad no hay con qué comparar contra la cadena de responsables.
+
+Se enciende sola cuando la **Etapa 3** del vínculo Employee↔User puebla ese dato. Punto
+exacto: `resolveViewerEmployeeId` en `src/app/api/clima/action-log/route.ts`. No hay nada
+más que cambiar ahí.
+
+### Base de datos: limpia (verificado fuera del script)
+
+```
+users.employee_id (maria@empresa.cl)      = NULL
+departments.responsable_id (Ger. Comercial) = NULL
+ClimaActionLogEntry en TODA la base       = 0
+ClimaActionLog con espejo NO nulo         = 0
+Departamentos con responsable             = 4   (los mismos que antes del gate)
+Users con vínculo employeeId              = 0
+```
+
+El fixture de review se revirtió y las 11 entradas de prueba se borraron por id exacto
+más `accountId`, con el espejo de los 8 `ClimaActionLog` padres restaurado a `null`.
+
+### Pendientes que quedan anotados
+
+| Qué | Dónde |
+|---|---|
+| Gatear la card por `pendingCount > 0`. Hoy daría 0 para todos y escondería la pantalla | `src/lib/constants/climaSubproductos.ts`, junto a la card |
+| El overlay de la bitácora es local a esta pantalla. Si otro módulo lo necesita, se EXTRAE a `components/ui` | comentario en `ClimaBitacoraView.tsx` |
+| Se perdió el aviso de "registró hace N horas" al sacarlo. El caso de dos personas registrando lo mismo ahora depende de que abran "N registros" antes de escribir | decisión Victor 2026-08-04 |
+| `useClimaCinemaMode.ts:162-179` hace `setActiveSubproducto(null)` al cambiar `campaignCacheKey`. Si se dispara, la Bitácora se desmonta y se pierde el borrador | fuera de alcance de este gate |
+| `employeeId` es claim cacheado 7 días: poblar o revocar el vínculo no tiene efecto hasta re-loguear | `ARQUITECTURA_VINCULO_EMPLOYEE_USER_v1.md` §Etapa 3 |
+
+### Scripts que NO se borran
+
+Contra la regla habitual de borrar los smokes al sellar, quedan tres en
+`prisma/scripts/` porque `ARQUITECTURA_VINCULO_EMPLOYEE_USER_v1.md:190-215` los documenta
+como el procedimiento de verificación para el día que se retome la Etapa 3:
+
+- `smoke-clima-actionlog-chain-guard.ts` (guard ampliado, GET y POST)
+- `smoke-clima-actionlog-mine.ts` (modo `scope=mine` y autoría)
+- `fixture-review-bitacora.ts` (enciende la pantalla para una persona, reversible)
+
+`smoke-clima-actionlog-read-guard.ts` es de la sesión de V1 (2026-08-01), no de este
+gate, y quedó superado por `chain-guard`. No se toca sin decisión de su autor.
+
+---
+
+
 > Gate 0 aprobado 2026-08-03. Decisiones D1-D6 selladas por Victor.
 > Gate 0 completo (verificaciones con file:line): `GATE0_BITACORA_ACCIONES_CLIMA.md`
 > Estado: **PLAN, esperando OK para F1.** Sin código escrito.
@@ -330,7 +383,9 @@ aparezca un instante tarde a que parpadee y desaparezca.
    Si tu dev server está arriba, salteo `prisma generate` (no se toca el schema).
 2. Verificar que Tab 1 y Tab 2 compilan y renderizan sin cambios.
 3. As-built en este mismo archivo.
-4. Borrar los dos smokes y el `smoke-clima-actionlog-read-guard.ts` que reemplazan.
+4. ~~Borrar los dos smokes y el `smoke-clima-actionlog-read-guard.ts` que reemplazan.~~
+   **REVERTIDO al sellar:** los smokes quedan porque el doc del vínculo los documenta
+   como procedimiento de verificación de la Etapa 3. Ver §ESTADO FINAL arriba.
 5. Commits: `git status -s` antes de cada uno, `git add` archivo por archivo,
    `git commit -F <msg> -- <paths>`, código y doc separados. **Sin push.**
 
