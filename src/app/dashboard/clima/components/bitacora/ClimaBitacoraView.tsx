@@ -12,12 +12,17 @@
 // NO es Tab 2. Tab 2 ("Atacar la causa") es la vista de consulta de RRHH y es
 // read-only. Esta pantalla no comparte código, tipos ni carpeta con ella.
 //
-// ── DOS ESTADOS, MISMO CONTENEDOR ─────────────────────────────────────────
+// ── TRES ESTADOS, MISMO CONTENEDOR ────────────────────────────────────────
 //
 // PORTADA (primer estado): título word-split, número hero en BLANCO como respaldo
-// del título, dos frases y UN CTA. Sin identidad de persona, sin salida propia
+// del título, narrativa y UN CTA. Sin identidad de persona, sin salida propia
 // (SKILL.md Gate 1). Molde CompensationPortada, NO el PATRÓN 5 de
 // page-patterns.md:211-270, que trae caja de misión, gauge y grilla.
+//
+// CIERRE (tercer estado): al quedar TODOS los focos registrados, UNA sola vez.
+// Mandamiento 9 (SKILL.md:186-188): responde "qué sigue" con un CTA visible.
+// Mientras queden focos pendientes el camino no es una pantalla, es el CTA al
+// siguiente foco dentro del overlay, que es transitorio (Mandamiento 5).
 //
 // FOCOS (segundo estado): UN SOLO LIENZO. Antes ocupaba tres pantallas de alto,
 // nueve bloques apilados, dos cajas separadas y doble scroll para llegar a lo único
@@ -56,13 +61,14 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { PrimaryButton, GhostButton } from '@/components/ui/PremiumButton';
+import { PrimaryButton, SecondaryButton, GhostButton } from '@/components/ui/PremiumButton';
 import { FHREmptyState } from '@/components/ui/FHREmptyState';
 import { useToast } from '@/components/ui/toast-system';
 import { dimensionLabel } from '@/lib/constants/climaDimensions';
 import {
   BITACORA_SCREEN,
   BITACORA_PORTADA,
+  BITACORA_CIERRE,
   BITACORA_PLAN,
   BITACORA_FORM,
   BITACORA_HISTORY,
@@ -74,6 +80,7 @@ import {
   bitacoraAbreviarDepartamentos,
   bitacoraSeeAll,
   bitacoraDisclosure,
+  bitacoraPendientes,
 } from '@/lib/constants/climaBitacoraContent';
 import type {
   ClimaBitacoraEntryDTO,
@@ -108,7 +115,13 @@ export default function ClimaBitacoraView({ campaignId, onBack }: Props) {
    * Motor de dos estados dentro del MISMO contenedor: portada, clic en el CTA, y el
    * cuerpo pasa al carrusel. Sin scroll y sin cambiar de ruta.
    */
-  const [vista, setVista] = useState<'portada' | 'focos'>('portada');
+  const [vista, setVista] = useState<'portada' | 'focos' | 'cierre'>('portada');
+  /**
+   * ¿El overlay lo abrió un REGISTRO o el botón "N registros"? El camino al siguiente
+   * foco solo tiene sentido en el primer caso: si la persona entró a leer, no se le
+   * empuja a moverse.
+   */
+  const [abiertoPorRegistro, setAbiertoPorRegistro] = useState(false);
   /** Solo móvil: los pasos se colapsan para que el campo entre en 568px de alto. */
   const [stepsOpen, setStepsOpen] = useState(false);
   const pillsRef = useRef<HTMLDivElement>(null);
@@ -117,6 +130,7 @@ export default function ClimaBitacoraView({ campaignId, onBack }: Props) {
   /** Cierra el overlay y devuelve el cursor al campo, que es a lo que la persona vino. */
   const cerrarHistorial = useCallback(() => {
     setHistoryOpen(false);
+    setAbiertoPorRegistro(false);
     textareaRef.current?.focus();
   }, []);
 
@@ -265,14 +279,36 @@ export default function ClimaBitacoraView({ campaignId, onBack }: Props) {
       }
       await refrescarEntradas(active.logId);
       setDrafts((p) => ({ ...p, [active.logId]: '' }));
-      setHistoryOpen(true); // que vea dónde quedó lo que escribió
       success(BITACORA_TOAST.success);
+
+      // Mandamiento 9: qué sigue. Se decide con lo que YA se sabe, no esperando a
+      // que el refetch aterrice: el foco recién registrado deja de estar pendiente
+      // por definición.
+      const restantes = items.filter((i) => i.logId !== active.logId && i.entriesCount === 0).length;
+      if (restantes === 0) {
+        // Cierre UNA sola vez, al quedar todo registrado. Después de cada registro
+        // serían 8 interrupciones (Mandamiento 5: revelar bajo demanda).
+        setVista('cierre');
+      } else {
+        setAbiertoPorRegistro(true);
+        setHistoryOpen(true); // que vea dónde quedó, y desde ahí el camino al siguiente
+      }
     } catch {
       toastError(BITACORA_TOAST.error);
     } finally {
       setSubmitting(false);
     }
-  }, [active, puedeRegistrar, trimmed, refrescarEntradas, success, toastError]);
+  }, [active, puedeRegistrar, trimmed, items, refrescarEntradas, success, toastError]);
+
+  /** Siguiente foco sin registrar, recorriendo en círculo desde el actual. -1 si no hay. */
+  const siguientePendiente = useMemo(() => {
+    if (items.length === 0) return -1;
+    for (let k = 1; k <= items.length; k += 1) {
+      const j = (activeIdx + k) % items.length;
+      if (items[j].entriesCount === 0) return j;
+    }
+    return -1;
+  }, [items, activeIdx]);
 
   const onVerAnteriores = useCallback(async () => {
     if (!active) return;
@@ -442,9 +478,9 @@ export default function ClimaBitacoraView({ campaignId, onBack }: Props) {
           <p className="text-base font-light text-slate-300 leading-relaxed mt-5">
             {BITACORA_PORTADA.narrative}
           </p>
-          <p className="text-sm font-light text-slate-500 leading-relaxed mt-3">
-            {BITACORA_PORTADA.consequence}
-          </p>
+          {/* La frase "un plan sin registro..." se fue al estado de cierre: era el
+              único texto que le hablaba al jefe de cómo se lo evalúa, y en la entrada
+              no aportaba. Después de registrar sí. */}
           <div className="mt-6">
             <PrimaryButton
               size="md"
@@ -455,6 +491,34 @@ export default function ClimaBitacoraView({ campaignId, onBack }: Props) {
               {BITACORA_PORTADA.cta}
             </PrimaryButton>
           </div>
+      </div>
+    );
+  }
+
+  // ── CIERRE — tercer estado, UNA sola vez, al quedar todo registrado ──────
+  //    Mandamiento 9 (SKILL.md:186-188): responde "qué sigue" con un CTA visible.
+  //    Antes se registraba, se abría la bitácora, y ahí terminaba. Sin barra
+  //    superior, igual que la portada: es un estado de cierre, no de trabajo.
+  if (vista === 'cierre') {
+    return shell(
+      <div className="flex flex-col items-center text-center py-6 md:py-10 max-w-2xl mx-auto">
+        <h2 className="text-2xl md:text-3xl font-extralight text-white tracking-tight leading-tight">
+          {BITACORA_CIERRE.titleWhite}
+        </h2>
+        <h3 className="text-xl md:text-2xl font-light tracking-tight leading-tight fhr-title-gradient">
+          {BITACORA_CIERRE.titleGradient}
+        </h3>
+        <p className="text-base font-light text-slate-300 leading-relaxed mt-5">
+          {BITACORA_CIERRE.body}
+        </p>
+        <p className="text-sm font-light text-slate-500 leading-relaxed mt-3">
+          {BITACORA_CIERRE.phrase}
+        </p>
+        <div className="mt-6">
+          <PrimaryButton size="md" icon={ArrowRight} iconPosition="right" onClick={onBack}>
+            {BITACORA_CIERRE.cta}
+          </PrimaryButton>
+        </div>
       </div>
     );
   }
@@ -476,7 +540,14 @@ export default function ClimaBitacoraView({ campaignId, onBack }: Props) {
             Se apagan del lado sin recorrido; `invisible` reserva el ancho para que
             la cabecera no salte. No se sacan: la rueda no funciona en este carrusel
             y son la única forma de navegarlo con mouse. */}
-        <div className="flex items-stretch border-b border-slate-800/60">
+        {/* La franja lleva superficie propia (`bg-slate-900/40`, el mismo tono que ya
+            tenían los bloques de flecha de esta fila). No es calibrar un color: el riel
+            de Performance se apoya sobre el fondo de card estándar
+            (MomentContent.tsx:140) y acá caía sobre el interior de la caja, que es
+            `bg-slate-950/30`. Mismo valor de riel sobre un sustrato más oscuro rinde
+            menos contraste, y por eso las pestañas se leían como texto suelto. Lo que
+            se replica del referente es la RELACIÓN entre el riel y su fondo. */}
+        <div className="flex items-stretch border-b border-slate-800/60 bg-slate-900/40">
           <button
             onClick={() => desplazarPildoras(-1)}
             aria-label="Focos anteriores"
@@ -498,7 +569,10 @@ export default function ClimaBitacoraView({ campaignId, onBack }: Props) {
                 TRANSPARENTES sobre el riel, que es lo que da la sensación de sólido.
                 No se inventa una variante con fondo propio por pestaña: esa no
                 existe en el sistema. */}
-            <div className="flex items-center gap-1 bg-slate-800/50 rounded-xl p-1 m-2 w-max">
+            {/* `min-w-full` para que la barra abarque la cabecera aunque las pestañas
+                no la llenen; `w-max` para que crezca y desborde cuando sí. Sin el
+                primero medía solo lo que medían las pestañas y no se leía como barra. */}
+            <div className="flex items-center gap-1 bg-slate-800/50 rounded-xl p-1 m-2 min-w-full w-max">
               {items.map((it, i) => (
                 <button
                   key={it.logId}
@@ -549,21 +623,24 @@ export default function ClimaBitacoraView({ campaignId, onBack }: Props) {
               aparecía dos veces. */}
           <div className="px-4 py-3 md:px-5 md:py-4 border-b border-slate-800/60">
             <div className="flex items-start justify-between gap-3">
-              <p className="text-[15px] text-slate-200 font-light leading-[1.6]">
+              {/* `min-w-0` + `break-words`: sin los dos, una cadena larga sin espacios
+                  (200 caracteres corridos) desborda la caja, porque un hijo flex no
+                  encoge por debajo del ancho de su contenido. */}
+              <p className="min-w-0 break-words text-[15px] text-slate-200 font-light leading-[1.6]">
                 {active.narrative}
               </p>
               {/* Acceso a la bitácora. Si el foco no tiene registros, NO EXISTE.
-                  Fondo sólido, texto blanco y borde definido: es el corazón de la
-                  pantalla y estaba gris sobre gris, a dos centímetros de una pestaña
-                  cian sólida. No va en cian para no competir con el botón de
-                  registrar, pero tampoco puede ser lo menos visible de la caja. */}
+                  SecondaryButton md con glow: es lo que la tabla de decisiones marca
+                  para acción secundaria (premium-components.md:316), y esa tabla dice
+                  literal "No improvisar variantes" (:311). Le había construido un
+                  tratamiento propio con fondo y borde a mano, y por eso seguía siendo
+                  lo menos visible de la caja después de dos intentos. */}
               {active.entriesCount > 0 && (
-                <button
-                  onClick={() => setHistoryOpen(true)}
-                  className="shrink-0 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-slate-700 text-white border border-slate-500 hover:bg-slate-600 hover:border-slate-400 transition-colors"
-                >
-                  {bitacoraDisclosure(active.entriesCount)}
-                </button>
+                <div className="shrink-0">
+                  <SecondaryButton size="md" glow onClick={() => setHistoryOpen(true)}>
+                    {bitacoraDisclosure(active.entriesCount)}
+                  </SecondaryButton>
+                </div>
               )}
             </div>
 
@@ -685,10 +762,15 @@ export default function ClimaBitacoraView({ campaignId, onBack }: Props) {
                   ) : (
                     <div className="space-y-3">
                       {active.entries.map((e) => (
-                        <div key={e.id} className="rounded-md bg-slate-800/60 px-3 py-2.5">
-                          {/* El texto es el protagonista; la firma va debajo, secundaria. */}
-                          <p className="text-[13px] text-slate-100 leading-relaxed">{e.text}</p>
-                          <p className="text-[10px] text-slate-400 mt-1.5">
+                        <div key={e.id} className="rounded-md bg-slate-800/60 px-3 py-2.5 min-w-0">
+                          {/* El texto es el protagonista; la firma va debajo, secundaria.
+                              `break-words`: el campo acepta 200 caracteres y nada obliga
+                              a que traigan espacios. Sin esto, una cadena corrida se sale
+                              de la caja (verificado en móvil y en escritorio). */}
+                          <p className="text-[13px] text-slate-100 leading-relaxed break-words">
+                            {e.text}
+                          </p>
+                          <p className="text-[10px] text-slate-400 mt-1.5 break-words">
                             {formatFecha(e.createdAt)}
                             {e.author && ` · ${e.author.name}`}
                             {e.author?.position && ` · ${e.author.position}`}
@@ -706,6 +788,33 @@ export default function ClimaBitacoraView({ campaignId, onBack }: Props) {
                           )}
                         </GhostButton>
                       )}
+                    </div>
+                  )}
+
+                  {/* ── CAMINO AL SIGUIENTE FOCO (Mandamiento 9) ──
+                      Vive DENTRO del overlay, que es transitorio: no agrega un bloque
+                      permanente a la caja. Solo si el overlay lo abrió un REGISTRO: si
+                      la persona entró a leer, no se la empuja a moverse. */}
+                  {abiertoPorRegistro && siguientePendiente >= 0 && (
+                    <div className="mt-4 pt-3 border-t border-slate-700/50 flex items-center justify-between gap-3 flex-wrap">
+                      <span className="text-[11px] font-light text-slate-400">
+                        {bitacoraPendientes(
+                          items.filter((i) => i.entriesCount === 0).length
+                        )}
+                      </span>
+                      <SecondaryButton
+                        size="md"
+                        glow
+                        icon={ArrowRight}
+                        iconPosition="right"
+                        onClick={() => {
+                          setActiveIdx(siguientePendiente);
+                          setHistoryOpen(false);
+                          setAbiertoPorRegistro(false);
+                        }}
+                      >
+                        {BITACORA_HISTORY.nextFocus}
+                      </SecondaryButton>
                     </div>
                   )}
                 </motion.div>

@@ -98,8 +98,28 @@ export const BITACORA_PORTADA = {
   back: 'Ver el resumen',
 
   narrative: 'Tus compromisos de Clima están activos. Registra lo que hiciste con cada uno.',
-  /** Consecuencia, no instrucción (Regla 3 de focalizahr-narrativas). */
-  consequence: 'Un plan sin registro es una declaración de intenciones sin evidencia.',
+} as const;
+
+/**
+ * Cierre. Tercer estado, una sola vez: cuando el último foco queda registrado.
+ *
+ * Mandamiento 9 (`SKILL.md:186-188`): toda pantalla de cierre responde "qué sigue"
+ * con un CTA visible. Antes se registraba, se abría la bitácora, y ahí terminaba.
+ *
+ * NO aparece después de cada registro: con 8 focos serían 8 interrupciones, y eso
+ * choca con el Mandamiento 5 (revelar bajo demanda). Mientras queden focos sin
+ * registrar, el camino es el CTA al siguiente dentro del overlay.
+ *
+ * Sin celebración ni mayúsculas sostenidas: enuncia el hecho. La frase baja de la
+ * portada, donde era el único texto que le hablaba al jefe de cómo se lo evalúa y
+ * en la entrada no aportaba. Acá sí: ya registró, y es lo que sostiene por qué.
+ */
+export const BITACORA_CIERRE = {
+  titleWhite: 'Registro',
+  titleGradient: 'completo',
+  body: 'Tus focos de Clima quedaron documentados.',
+  phrase: 'Un plan sin registro es una declaración de intenciones sin evidencia.',
+  cta: 'Volver a Clima',
 } as const;
 
 /**
@@ -135,6 +155,13 @@ export const BITACORA_HISTORY = {
    * después, no pone plazo ni instrucción (Regla 3).
    */
   invite: 'Aquí queda lo que registres sobre este foco.',
+
+  /**
+   * Camino al siguiente foco (Mandamiento 9). Vive DENTRO del overlay que ya se abre
+   * al registrar, que es transitorio: no agrega un bloque permanente a la caja.
+   * Solo aparece cuando el overlay lo abrió un registro, no cuando lo abrió el botón.
+   */
+  nextFocus: 'Ir al siguiente foco',
 
   loadingMore: 'Cargando',
 } as const;
@@ -236,4 +263,9 @@ export function bitacoraSeeAll(total: number): string {
 export function bitacoraDisclosure(total: number): string {
   if (total === 0) return 'sin registros';
   return total === 1 ? '1 registro' : `${total} registros`;
+}
+
+/** Cuántos focos quedan sin registrar, al lado del camino al siguiente. */
+export function bitacoraPendientes(n: number): string {
+  return n === 1 ? 'Queda 1 foco sin registrar' : `Quedan ${n} focos sin registrar`;
 }
