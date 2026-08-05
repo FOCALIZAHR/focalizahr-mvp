@@ -23,7 +23,8 @@ Deriva del orden de construcción del plan maestro §5. El paso 1 de ese orden
 |------|--------|--------|--------|
 | H0 | Gate 0 read-only — verificación contra código real | ✅ | _(sin código)_ |
 | H1 | Hub con las 3 cápsulas | ✅ | `7a6c771` + `9c5260e` |
-| H2 | Cápsula 3 — Estado A (pre-resultados, sin LLM) | ⬜ | |
+| H2a | Cápsula 3 — Estado A · cobertura por gerencia | ✅ | `8fdc922` + `8478d3a` |
+| H2b | Cápsula 3 — Estado A · cadencia táctica | ⛔ | bloqueada por dato |
 | H3 | Cápsula 3 — Estado B (post-resultados, motores) | ⬜ | |
 | H4 | Cápsula 3 — Motores avanzados + cruces de suite | ⏸️ | |
 
@@ -250,23 +251,91 @@ de props, así que el rediseño de esa pantalla y este hub no se pisan.
 
 ---
 
-## H2 — Cápsula 3, Estado A ⬜
+## H2a — Cápsula 3, Estado A · cobertura ✅ SELLADO 2026-08-05
 
-Pre-resultados. Funciona ANTES del Seguimiento Focalizado. Sin LLM, sin deltas.
+**Commits:** `8fdc922` (endpoint + contrato) · `8478d3a` (copy + UI) · doc aparte.
 
-### H2.1 — Backend ⬜
-- [ ] Endpoint nuevo de actividad (cobertura por gerencia + cadencia)
-- [ ] Cadencia = timestamps de `ClimaActionLogEntry.createdAt`, sin LLM
-- [ ] Skill `focalizahr-api`
+**Nuevos:** `api/clima/action-log/coverage/route.ts` ·
+`components/clima/ClimaProgressRing.tsx` ·
+`.../planes/ClimaCoberturaGerencias.tsx`
+**Modificados:** `types/clima-hub.ts` · `climaHubContent.ts` ·
+`ClimaEfectividadHallazgos.tsx` · `ClimaEfectividadView.tsx` (prop de paso) ·
+`ClimaPlanesHub.tsx` (prop de paso)
 
-### H2.2 — UI Estado A ⬜
-- [ ] Skills `focalizahr-design` + `focalizahr-narrativas`
-- [ ] Estado vacío neutro, sin interpretar la ausencia (plan §2.5)
+### Lo construido
+Layout 30/70. Izquierda: **pulso de actividad** — días desde `approvedAt`, no el
+porcentaje (ver más abajo). Derecha: una **card con anillo por gerencia**, con
+drill-down a departamentos, encadenada por un riel a "lo que falta para el
+veredicto". La cadencia NO entró: ver H2b.
 
-### H2.3 — Verificación y sello ⬜
-- [ ] Smoke con evidencia real · tsc · build · smoke borrado · commits
+### 🐛 Bug de scope que encontró el smoke — la razón de exigir numeradores reales
+`buildCoverageTree` subía al `parentId` sin comprobar que el padre estuviera
+dentro del scope del viewer. Un `AREA_MANAGER` recibía su árbol colgando de un
+nodo raíz con el `departmentId` de la gerencia superior — **una unidad que no le
+corresponde ver**. Los conteos eran correctos; lo que se filtraba era el
+identificador del ancestro.
 
-**Commit(s):** _(pendiente)_
+**Con cobertura 0 esa rama no se ejecuta.** El plan original de este gate era
+probar con numerador 0 ("prueba la estructura"); Victor lo rechazó y exigió datos
+que cubrieran. El bug apareció en la primera corrida con datos reales. Sin esa
+corrección, habría llegado a producción.
+
+→ Regla para H3: **un smoke de agregación con numerador 0 no prueba la
+agregación.** Si hace falta fixture, se hace fixture.
+
+### Decisiones de diseño, con su razón
+| Qué | Por qué |
+|---|---|
+| El hero de la izquierda es el TIEMPO, no el % | El % global ya lo dio la portada un clic antes y cada card da el suyo. Los días son lo único que no está en ninguna superficie y que no se puede inferir. Y le dan peso al conteo: "0 de 17" no dice lo mismo a los 2 días que a los 90. |
+| Anillo con color FIJO | `SegmentedRing.tsx:18-23` tiene `getProgressColor(pct)` (esmeralda ≥100, cyan ≥60, violeta ≥30) = semáforo. Se clonó su mecánica SVG, no esa función. Tampoco su `getInsightText()` ("Ritmo Constante"), que es opinión sobre un conteo. |
+| Sin degradado en el relleno | El gradiente cyan→violeta es la firma de marca (Tesla line). Como relleno de dato se vuelve semántica. |
+| `approvedAt` viaja en el DTO | Es un hecho del servidor —cuándo aprobó una persona—, no algo que el navegador deba inferir. |
+| Copy sin "pendiente"/"faltante" | Plan §6 literal: "si el jefe no escribe, eso es un dato, no un error". |
+
+### Moldes usados (y los descartados, con su razón)
+| Pieza | Molde | Descartado |
+|---|---|---|
+| 30/70 | reja de `EvaluadorHeatmap.tsx:443` + estructura de `RoleFitDisplayCard.tsx:292` | `compliance/.../DecisionConsole.tsx` (deuda reconocida) y el chrome de `RoleFitDisplayCard` (`bg-[#0F172A]/90 backdrop-blur-2xl rounded-[24px]` = tokens prohibidos) |
+| anillo | `evaluator/cinema/SegmentedRing.tsx` | `TeamCoverageGauge` (barra con degradado + ámbar semántico) · `IndicatorGauge` (compliance) |
+| filas / drill-down | `UnitRow` de `ClimaDimensionesView.tsx:322` | — |
+| panel interior | `ClimaDimensionesView.tsx:279-285` | — |
+
+### Evidencia del smoke — 30/30 contra la base real
+Fixture reversible: `responsable_id` de Gerencia Comercial + 2 entradas creadas
+vía el **POST real** (no insert directo) en dos departamentos distintos.
+
+```
+Gerencia de Tecnología   0/5    0%     ← contraste: no se contamina
+Gerencia de Finanzas     0/4    0%
+Gerencia Comercial       2/8   25%     ← numerador creado por el smoke
+  Atención a Clientes    1/6   17%
+  Comercial              1/2   50%
+
+approvedAt = 2026-07-22T11:52:12.779Z  ← dato leído de vuelta, no inferido
+AREA_MANAGER: total=2 · raíz="Comercial" (no la gerencia de arriba)
+```
+
+⚠️ **El cleanup restaura TRES cosas, no una.** El POST no solo crea la entrada:
+pisa el espejo del padre (`actionText`/`registeredAt`/`registeredBy`,
+`action-log/route.ts:713-720`). Borrar las entradas dejaría 2 focos marcados como
+registrados para siempre — justo el dato que la cápsula mide. Los valores previos
+se capturan antes de escribir y se restauran por id en `$transaction`.
+
+---
+
+## H2b — Cápsula 3, Estado A · cadencia ⛔
+
+**Bloqueada por DATO, no por código.** Decisión de Victor: construir la
+distribución desde t0 (aprobación) hasta hoy, y recalibrarla contra t1 cuando
+exista el Seguimiento Focalizado cerrado, para detectar el "48h antes de la
+medición" del plan §2.3.
+
+**No se construyó porque hay 0 filas.** La única fuente de timestamps es
+`ClimaActionLogEntry.createdAt`, y escribir una entrada exige resolver
+`User.employeeId`, en NULL para toda la base hasta la Etapa 3 del vínculo
+Employee↔User. No es poco dato: es ninguno, y no hay camino a tenerlo.
+
+Se retoma en H3, junto con t1.
 
 ---
 
@@ -352,6 +421,22 @@ monta con el mismo contrato de props que ya expone (`campaignId`, `onBack`,
 | 2026-08-05 | Gate 0 (H0) ejecutado. 6 divergencias reportadas. Documento creado. |
 | 2026-08-05 | D2 y D3 resueltas por Victor. Hub con 3 cápsulas, Bitácora fuera del Rail, tab 3 retirado (`7a6c771`). Smoke 17/17, tsc y build limpios. |
 | 2026-08-05 | Victor revisó en pantalla → 4 rondas de corrección de diseño (`9c5260e`). **H1 SELLADO.** Ninguna fue de lógica: las cuatro eran usar el molde que ya existía en vez de uno propio. tsc y build limpios. Sin pushear. |
+| 2026-08-05 | **H2a SELLADO** (`8fdc922`+`8478d3a`). Gate 0 encontró que la cadencia no tiene datos → gate partido en H2a/H2b. El smoke con numeradores reales (exigidos por Victor) destapó un bug de scope que con numerador 0 era invisible. 30/30, tsc y build limpios. Sin pushear. |
+
+---
+
+## Estado de la cuenta de prueba al cerrar H2a
+
+Todo lo que este gate escribió en producción quedó revertido y verificado por
+relectura:
+
+- `fixture-review-bitacora.ts` → **REVERTIDO** (ambas filas en NULL).
+- Entradas del smoke → **BORRADAS**, y el espejo de sus 2 padres restaurado.
+- `departments.responsable_id` de Gerencia Comercial → **NULL**.
+
+Estado real hoy: **0 entradas de bitácora, 0 focos con registro, 17 focos
+aprobados en 3 gerencias raíz**. La pantalla de cobertura muestra 0% en las tres,
+que es el dato correcto — no un error.
 
 ---
 
