@@ -32,3 +32,51 @@ export interface ClimaPlanesProgressResponse {
   data?: ClimaPlanesProgressDTO;
   error?: string;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Cobertura de registro por gerencia (H2a) — Cápsula 3, Estado A.
+//
+// Responde "quién escribió y quién no", agregado por unidad organizacional. Es el
+// MISMO numerador que la portada (`actionText !== null`), abierto por rama del
+// árbol en vez de sumado en un solo número.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Una unidad del árbol con su cobertura AGREGADA (la propia más la de todos sus
+ * descendientes). Recursiva: `children` permite bajar gerencia → departamento sin
+ * pedir nada más al servidor.
+ *
+ * Misma forma que `ClimaDepartmentInsight.children` (`types/clima.ts:138`), para
+ * que la UI pueda clonar `UnitRow` sin adaptar el shape.
+ */
+export interface ClimaCoberturaUnidadDTO {
+  departmentId: string;
+  departmentName: string;
+  /** Focos aprobados en esta unidad y todo su subárbol. */
+  total: number;
+  /** De esos, cuántos tienen al menos una acción registrada. */
+  withAction: number;
+  /** 0-100. Nunca null acá: una unidad sin focos no se incluye en el árbol. */
+  pct: number;
+  /** Unidades hijas con focos. `undefined` en hojas. */
+  children?: ClimaCoberturaUnidadDTO[];
+}
+
+export interface ClimaCoberturaDTO {
+  /** Unidades de primer nivel del scope visible, peor cobertura primero. */
+  units: ClimaCoberturaUnidadDTO[];
+  /** Totales del scope — coinciden con los de `/summary` para el mismo viewer. */
+  total: number;
+  withAction: number;
+  pct: number | null;
+  /**
+   * Cuándo se aprobó el plan (`ActionPlan.approvedAt`), en ISO. Es el t0 del
+   * seguimiento: desde acá se cuentan los días que lleva abierto el periodo de
+   * registro.
+   *
+   * Va en el DTO y no se deriva en el cliente porque es un hecho del servidor: la
+   * fecha en que un humano aprobó, no algo que el navegador pueda inferir.
+   * `null` si el plan quedó aprobado sin sellar la fecha (planes viejos).
+   */
+  approvedAt: string | null;
+}
