@@ -25,7 +25,11 @@ Deriva del orden de construcción del plan maestro §5. El paso 1 de ese orden
 | H1 | Hub con las 3 cápsulas | ✅ | `7a6c771` + `9c5260e` |
 | H2a | Cápsula 3 — Estado A · cobertura por gerencia | ✅ | `8fdc922` + `8478d3a` |
 | H2b | Cápsula 3 — Estado A · cadencia táctica | ⛔ | bloqueada por dato |
-| H3 | Cápsula 3 — Estado B (post-resultados, motores) | ⬜ | |
+| H3a | Motores de texto — densidad + verbos (backend) | ✅ | `669a6e6` |
+| H3b | Cadencia (UI con placeholder) | ⬜ | |
+| H3c | Cuadrantes + COM-B (UI con placeholder) | ⬜ | |
+| H3d | Cruces cross-módulo (UI con placeholder) | ⬜ | |
+| H3-UI | Cascada de hallazgos — **espera diseño de Gemini** | ⬜ | |
 | H4 | Cápsula 3 — Motores avanzados + cruces de suite | ⏸️ | |
 
 **Dependencias duras entre gates:**
@@ -339,6 +343,93 @@ Se retoma en H3, junto con t1.
 
 ---
 
+## H3a — Motores de texto ✅ SELLADO 2026-08-06 · `669a6e6`
+
+**Nuevos:** `src/types/clima-text-analysis.ts` ·
+`src/lib/services/clima/ClimaTextAnalysisService.ts`
+**Modificado:** `ClimaAggregationService.ts` — Fase 4e (enganche)
+**Sin UI.** El motor está completo; la pantalla se construye en el gate siguiente.
+
+### Lo construido
+Motores 1 y 2 del plan §2.3 sobre el texto libre de la bitácora: entidades
+concretas (fechas, herramientas, procesos, cantidades, con los **fragmentos
+literales**, no solo el conteo) y modo del verbo núcleo (ejecución / intención /
+ninguno). Persistido en `ClimaActionLog.llmClassification`, campo que existía
+desde Gate 5C y que nadie había escrito.
+
+**Haiku para clasificar. Nada de narrativa acá** (decisión de Victor): mezclar
+"clasificá" con "redactá para el CEO" en un prompt degrada las dos tareas y
+obliga a re-clasificar todo para cambiar un tono.
+
+### Las dos decisiones de Victor que corrigieron el plan §2.3
+Quedaron escritas en el propio plan maestro, sección **2.3.bis**.
+
+**(a) La densidad nunca se muestra sola.** Salió del dato: la entrada que solo
+refuta el hallazgo —*"eso no es verdad, acá todos han crecido"*— puntuó densidad
+2 porque nombraba "próxima evaluación" y "encuesta". Leída sola, premia a quien
+argumenta mejor. Va combinada con el verbo en `deriveCompositeSignal()`, función
+**pura y sin LLM**: el modelo clasifica, la regla de negocio vive en el código.
+
+**(b) Umbral de visibilidad ≥30 entradas por gerencia** para mostrarle hallazgos
+de LLM al CEO. **Gate de visibilidad, no de cómputo**: el clasificador corre y
+persiste desde la primera entrada, para que al cruzar el umbral haya historia
+acumulada y no haya que reprocesar hacia atrás.
+
+### 📌 Hallazgo: el compuesto amortigua un clasificador inestable
+Cuatro corridas con `temperature 0` sobre las mismas 8 entradas:
+
+| Entrada | c1 | c2 | c3 | c4 |
+|---|---|---|---|---|
+| "estoy esperando…" | 0 | 0 | 1 | 0 |
+| "Convocaré de inmediato…" | 1 | 0 | 0 | **4** |
+| "HEMOS RECONOCIDO…" (ejecución) | 3 | 3 | 3 | 3 |
+
+La extracción de entidades **no es determinista** — una entrada osciló 0↔4. Pero
+**el score compuesto dio 2/16 en las cuatro corridas, sin moverse**: toda la
+variación cae en entradas de `intención`, que puntúan 0 cualquiera sea la
+densidad. La regla (a) resultó ser también un amortiguador de ruido.
+
+⚠️ **Lo que queda abierto:** una entrada de `ejecución` que oscile entre densidad
+1 y 2 SÍ haría saltar su score entre 1 y 2. No pasó con estos datos (la única de
+ejecución dio 3 estable). Se calibra `DENSITY_HIGH_THRESHOLD` al llegar a 30.
+
+### Conducta que el plan no contemplaba
+Ni ejecución ni intención: la **refutación** ("eso no es verdad"). Se agrupa hoy
+bajo `ninguno` con rationale `sin_accion`, sin inventarle un valor propio al
+union — eso es contrato y lo decide Victor.
+
+### Evidencia
+8/8 entradas clasificadas · 8/8 filas persistidas y releídas por id ·
+`signalScore` 2 en el foco de los desayunos, 0 en los otros siete.
+Resultado real: **75% intención / 13% ejecución / 13% sin acción** — más marcado
+que el 68/32 que el plan §2.7 traía como ejemplo ficticio.
+
+⚠️ **NO ejercitado:** el enganche de Fase 4e (`analyzeOnFollowUpClose`). Solo
+dispara al cerrar un Seguimiento Focalizado y esta cuenta nunca tuvo uno.
+Comparte el núcleo `persistForLogs` con lo que sí corrió; lo no probado es la
+query que resuelve focos por departamento medido. **Es el mismo tipo de código
+que en H2a escondía un bug de scope** — revisarlo cuando exista un follow-up.
+
+---
+
+## H3-UI — Cascada de hallazgos ⏸️ ESPERA DISEÑO DE GEMINI
+
+Regla de Victor: Code construye lo que Gemini diseña, no inventa el diseño solo
+(lección de las 4 rondas de H1). Insumos reales para pedirlo:
+
+- El hallazgo medido es **75% intención / 13% ejecución**, no el 68/32 inventado.
+- Score por entrada 0-2. Hoy **2 sobre 16 posibles**.
+- Cinco rationales, **tres de los cuales puntúan 0 y son conductas distintas**:
+  `ejecucion_densa` (2) · `ejecucion_vaga` (1) · `intencion_argumentada` (0) ·
+  `intencion_vaga` (0) · `sin_accion` (0). Que "promete con detalle" y "no hizo
+  nada" puntúen igual pero se vean distinto es la parte difícil.
+- **Hay que diseñar DOS estados**: bajo el umbral de 30 (placeholder) y sobre él.
+  El placeholder es el que se va a ver durante meses.
+- Regla ética §2.6 vigente: nombre completo y cargo siempre; se califica la
+  táctica, nunca a la persona.
+
+---
+
 ## H3 — Cápsula 3, Estado B ⬜
 
 ⛔ **Bloqueado por dato, no por código** — ver divergencia D5.
@@ -421,7 +512,9 @@ monta con el mismo contrato de props que ya expone (`campaignId`, `onBack`,
 | 2026-08-05 | Gate 0 (H0) ejecutado. 6 divergencias reportadas. Documento creado. |
 | 2026-08-05 | D2 y D3 resueltas por Victor. Hub con 3 cápsulas, Bitácora fuera del Rail, tab 3 retirado (`7a6c771`). Smoke 17/17, tsc y build limpios. |
 | 2026-08-05 | Victor revisó en pantalla → 4 rondas de corrección de diseño (`9c5260e`). **H1 SELLADO.** Ninguna fue de lógica: las cuatro eran usar el molde que ya existía en vez de uno propio. tsc y build limpios. Sin pushear. |
-| 2026-08-05 | **H2a SELLADO** (`8fdc922`+`8478d3a`). Gate 0 encontró que la cadencia no tiene datos → gate partido en H2a/H2b. El smoke con numeradores reales (exigidos por Victor) destapó un bug de scope que con numerador 0 era invisible. 30/30, tsc y build limpios. Sin pushear. |
+| 2026-08-05 | **H2a SELLADO** (`8fdc922`+`8478d3a`). Gate 0 encontró que la cadencia no tiene datos → gate partido en H2a/H2b. El smoke con numeradores reales (exigidos por Victor) destapó un bug de scope que con numerador 0 era invisible. 30/30, tsc y build limpios. |
+| 2026-08-05 | Pusheado todo lo acumulado hasta `5241eff` (11 commits, 4 de la sesión paralela de Bitácora). |
+| 2026-08-06 | **H3a SELLADO** (`669a6e6`). Motores de densidad y verbos, tipados y persistidos. Dos decisiones de Victor corrigieron el plan §2.3 (ver 2.3.bis). El compuesto resultó amortiguar un clasificador que NO es determinista. Sin UI: espera diseño de Gemini. tsc y build limpios. |
 
 ---
 
@@ -434,9 +527,17 @@ relectura:
 - Entradas del smoke → **BORRADAS**, y el espejo de sus 2 padres restaurado.
 - `departments.responsable_id` de Gerencia Comercial → **NULL**.
 
-Estado real hoy: **0 entradas de bitácora, 0 focos con registro, 17 focos
-aprobados en 3 gerencias raíz**. La pantalla de cobertura muestra 0% en las tres,
-que es el dato correcto — no un error.
+Estado al cerrar H2a: 0 entradas, 0 focos con registro, 17 focos aprobados en 3
+gerencias raíz.
+
+**Actualizado al cerrar H3a (2026-08-06):** Victor escribió **8 entradas reales**
+desde la Bitácora mientras el fixture de review estaba puesto. `--revert` NO las
+borra (y hace bien: son dato real, no fixture). Estado hoy:
+
+- **8 `ClimaActionLogEntry`** con texto real, 1 por foco, en 8 focos distintos.
+- **8 `ClimaActionLog` con `actionText`** → la cobertura ya NO muestra 0%.
+- **8 filas con `llmClassification` poblado** por H3a.
+- El fixture (`users.employee_id`, `departments.responsable_id`) sigue REVERTIDO.
 
 ---
 
