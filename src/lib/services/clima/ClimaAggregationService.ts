@@ -27,6 +27,7 @@ import {
 import { PRIVACY_THRESHOLD } from '@/lib/services/SafetyScoreService';
 import { PulseDeptInput, calcRiskZone, computePulse } from './PulseEngine';
 import { ActionEffectivenessService } from './ActionEffectivenessService';
+import { ClimaTextAnalysisService } from './ClimaTextAnalysisService';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constantes de dominio
@@ -581,10 +582,13 @@ export class ClimaAggregationService {
           // Cero re-queries: reusa pulseOutputs (momentumDelta ya calculado) en memoria.
           // Degrade-safe: fallo acá no bloquea el cierre.
           if (isFollowUp) {
+            // Se declara FUERA de los try para que 4d y 4e la compartan: son dos
+            // capacidades independientes sobre el mismo conjunto de departamentos
+            // medidos, y cada una tiene su propio manejo de error.
+            const driverAnalysisByDept = new Map(
+              Array.from(pulseOutputs.entries()).map(([deptId, o]) => [deptId, o.driverAnalysis])
+            );
             try {
-              const driverAnalysisByDept = new Map(
-                Array.from(pulseOutputs.entries()).map(([deptId, o]) => [deptId, o.driverAnalysis])
-              );
               await ActionEffectivenessService.evaluateOnFollowUpClose({
                 accountId,
                 campaignId,
@@ -594,6 +598,29 @@ export class ClimaAggregationService {
               errors.push({
                 departmentId: 'ACTION_EFFECTIVENESS',
                 error: effError instanceof Error ? effError.message : String(effError),
+              });
+            }
+
+            // 4e. Análisis de texto de la bitácora (H3a) — densidad de entidades y
+            // verbos de ejecución vs. intención sobre lo que escribió cada jefe.
+            // Se persiste en ClimaActionLog.llmClassification.
+            //
+            // try/catch PROPIO, separado del de 4d: el veredicto de la matriz no
+            // puede caerse porque la API del modelo esté caída, y viceversa. Son
+            // dos capacidades independientes sobre las mismas filas.
+            //
+            // Corre aunque no se llegue al umbral de 30 entradas por gerencia: ese
+            // umbral es un gate de VISIBILIDAD de la UI, no de cómputo. Si el
+            // análisis esperara volumen, al cruzarlo no habría historia acumulada.
+            try {
+              await ClimaTextAnalysisService.analyzeOnFollowUpClose({
+                accountId,
+                departmentIds: Array.from(driverAnalysisByDept.keys()),
+              });
+            } catch (textError) {
+              errors.push({
+                departmentId: 'CLIMA_TEXT_ANALYSIS',
+                error: textError instanceof Error ? textError.message : String(textError),
               });
             }
           }
