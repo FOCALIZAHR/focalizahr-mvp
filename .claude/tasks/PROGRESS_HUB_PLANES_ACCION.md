@@ -26,10 +26,11 @@ Deriva del orden de construcción del plan maestro §5. El paso 1 de ese orden
 | H2a | Cápsula 3 — Estado A · cobertura por gerencia | ✅ | `8fdc922` + `8478d3a` |
 | H2b | Cápsula 3 — Estado A · cadencia táctica | ⛔ | bloqueada por dato |
 | H3a | Motores de texto — densidad + verbos (backend) | ✅ | `669a6e6` |
-| H3b | Cadencia (UI con placeholder) | ⬜ | |
-| H3c | Cuadrantes + COM-B (UI con placeholder) | ⬜ | |
-| H3d | Cruces cross-módulo (UI con placeholder) | ⬜ | |
-| H3-UI | Cascada de hallazgos — **espera diseño de Gemini** | ⬜ | |
+| H3b | Narrativa ejecutiva + pantallas de la Cápsula 3 | ✅ | ver as-built |
+| H3c | Cuadrantes + COM-B | ⛔ | bloqueado por dato |
+| H3d | Cruces cross-módulo | ⏸️ | gate futuro |
+| — | Cadencia temporal (ex H2b) | ⛔ | bloqueada por dato |
+| — | Modo Macro (≥15 entradas) | ⬜ | se diseña con datos reales |
 | H4 | Cápsula 3 — Motores avanzados + cruces de suite | ⏸️ | |
 
 **Dependencias duras entre gates:**
@@ -410,6 +411,124 @@ Comparte el núcleo `persistForLogs` con lo que sí corrió; lo no probado es la
 query que resuelve focos por departamento medido. **Es el mismo tipo de código
 que en H2a escondía un bug de scope** — revisarlo cuando exista un follow-up.
 
+
+---
+
+## H3b — Narrativa ejecutiva + Cápsula 3 completa ✅ SELLADO 2026-08-08
+
+**Nuevos (9):**
+```
+prisma/schema.prisma                        modelo ClimaEffectivenessNarrative
+src/lib/services/clima/
+  ClimaFindingNarrativeService.ts           Sonnet: genera + valida
+  ClimaNarrativeRefreshService.ts           hash + persistencia (lo llama el cron)
+src/app/api/clima/action-log/
+  findings/route.ts                         modo elástico, etiquetas ejecutivas
+  narrative/route.ts                        LEE la narrativa persistida
+src/app/api/cron/clima-narrative-refresh/   el worker
+src/app/dashboard/clima/components/planes/
+  ClimaEfectividadCobertura.tsx             pantalla 2
+  ClimaHallazgoCard.tsx · ClimaFindingCard.tsx · ClimaRadarEjecucion.tsx
+vercel.json                                 el cron REGISTRADO
+```
+
+### Las tres pantallas
+```
+portada          → gancho dinámico de ejecución + CTA
+  ↓ Ver cobertura
+cobertura        → 30/70 · "hace N días el último registro" | cards con anillo
+  ↓ Ver hallazgos
+hallazgos        → 30/70 · identidad del motor | headline de Sonnet + evidencia
+```
+
+### El pipeline de inteligencia
+```
+jefe escribe → POST guarda → Haiku clasifica (fase 4e del cierre)
+                                    ↓
+              CRON 1x/día 05:00 → ¿cambió el hash de clasificaciones?
+                                  no  → CERO llamadas al modelo
+                                  sí  → Sonnet → persiste + hash nuevo
+                                    ↓
+              CEO entra → lee la fila → instantáneo
+```
+
+**Haiku clasifica, Sonnet redacta, y son pasos separados** (decisión de Victor):
+mezclarlos en un prompt degrada las dos tareas y obliga a re-clasificar todo para
+cambiar un tono.
+
+### 🛡️ Control de alucinaciones — dos capas, y las dos atraparon casos reales
+
+**Capa A (prompt) · Regla de Oro de Evidencia.** Prohibido "ningún/todos/siempre"
+o cualquier cifra sin listar los IDs (R1, R2…) que lo sostienen. Obliga al modelo
+a recorrer los registros en vez de generalizar de memoria.
+
+**Capa B (código) · `validarNarrativa()`.** No confía en la capa A. Rechaza:
+IDs internos filtrados al texto visible · absolutos sin respaldo · IDs
+inexistentes · cifras que no coinciden con ningún conteo real. **Descarta la
+narrativa entera**, no corrige la frase: el resto del párrafo se apoyaba en ella.
+
+| Caso real atrapado | Cómo |
+|---|---|
+| *"En los 5 casos… **ninguno** lo menciona"* — falso, uno sí | medido contra la base: era 4 de 5 |
+| *"ninguna de esas **cinco** respuestas"* | cifra en LETRAS; la validación miraba solo dígitos → se agregó el mapa `NUMEROS_EN_LETRAS` |
+| *"usa la cifra 4, que no coincide con ningún conteo"* | rechazo automático, cayó al template |
+
+⚠️ **Lo que NINGUNA capa atrapa:** un absoluto bien citado pero semánticamente
+falso. Verificarlo exige releer los textos con otro modelo, y ahí entramos en
+verificar al verificador. La capa A baja el riesgo; no lo elimina.
+
+### Decisiones de arquitectura
+| Qué | Por qué |
+|---|---|
+| Tabla propia, no `ActionPlan` | es dato agregado; y `ActionPlan.resumenSnap` lo sobreescribe el cliente entero (`[planId]/route.ts:149`) — la narrativa desaparecería sin rastro |
+| Invalidación por **hash**, no por conteo | si alguien reclasifica sin agregar entradas, el conteo no se mueve pero la narrativa queda afirmando algo sobre una lectura que ya no existe |
+| Cron, no caché en memoria | en serverless cada instancia tiene la suya: el ahorro era ficticio y con 90 jefes salían cientos de llamadas |
+| Una fila GLOBAL por plan | todos leen la misma; una por jefe serían decenas de llamadas para decir casi lo mismo |
+| El template es el **piso**, no un loading | si Sonnet nunca responde, lo que queda es correcto |
+| Etiquetas traducidas en el SERVIDOR | si `verbMode` viajara crudo, bastaría la pestaña de red para leer el vocabulario del motor |
+
+### 🐛 Hallazgos del camino
+**Un `@@unique` con columna nullable no enforcea nada en Postgres.** `NULL != NULL`,
+así que `(actionPlanId, scope, departmentId)` permitía dos filas GLOBAL para el
+mismo plan. Cambiado a `(actionPlanId, scope)`.
+⚠️ **`ComplianceAnalysis` tiene la misma forma y el mismo agujero** en sus filas
+ORG — anotado en el backlog, no tocado.
+
+**Presupuesto de tokens.** Tres corridas seguidas se descartaban y parecía falta
+de patrón: era que enumerar 8 registros agotaba los 1500 tokens y el modelo
+llegaba al headline sin espacio. Subido a 4000.
+
+**Dos tipos de "sin narrativa".** Si el modelo dice que no hay patrón, es una
+respuesta: se cierra. Si la validación descartó, es un tropiezo de redacción:
+queda `PENDING` y el cron lo reintenta hasta 3 veces. Sin esa distinción, una
+tirada mala dejaba al CEO con el template durante semanas.
+
+### 📌 P0-5 · Seis crons construidos que nunca se ejecutan
+Hallado al buscar dónde enganchar este cron: `vercel.json` registraba **5 de 11**
+rutas. Entre las muertas, `compliance-process-pending` —el worker de la cola que
+este gate clonó como patrón—. **El modo de falla es silencioso:** un job que nunca
+corre no tira error, la UI cae a su estado vacío y se ve bien.
+→ Detalle en `BACKLOG_ENTERPRISE.md`. **Este cron se registró en `vercel.json` en
+el mismo commit que su ruta**, que es exactamente lo que no se hizo con los otros.
+
+### ⚠️ Lo NO verificado
+- **El cron nunca corrió en Vercel.** Probado invocando el handler directo
+  (2 ticks, corte por hash confirmado: 46 s → 22 s → skip). En producción depende
+  de que Vercel lo dispare y de que el plan Hobby lo admita.
+- **Fase 4e de Haiku** sigue sin ejercitarse: requiere cerrar un Seguimiento
+  Focalizado, que esta cuenta nunca tuvo.
+- **La UI no la vi renderizada** — `tsc` + build + tokens verificados por código;
+  la revisión visual fue de Victor.
+
+### Lección de método
+La pantalla de hallazgos se reestructuró **cinco veces**. Las cinco el error fue
+el mismo: acomodar lo anterior en vez de abrir el molde correcto. Layout propio →
+`SpotlightCard` (patrón de PERSONA, no de panel) → header arriba del split →
+rótulo uppercase de card → recién el word-split canónico.
+**Lo resolvió un mockup en una lectura** (`PANTALLA2_SEG_PLANES_CLIMA.JPG`).
+→ Cuando existe referencia visual, pedirla ANTES sale más barato que tres
+iteraciones de adivinar el patrón.
+
 ---
 
 ## H3-UI — Cascada de hallazgos ⏸️ ESPERA DISEÑO DE GEMINI
@@ -515,6 +634,8 @@ monta con el mismo contrato de props que ya expone (`campaignId`, `onBack`,
 | 2026-08-05 | **H2a SELLADO** (`8fdc922`+`8478d3a`). Gate 0 encontró que la cadencia no tiene datos → gate partido en H2a/H2b. El smoke con numeradores reales (exigidos por Victor) destapó un bug de scope que con numerador 0 era invisible. 30/30, tsc y build limpios. |
 | 2026-08-05 | Pusheado todo lo acumulado hasta `5241eff` (11 commits, 4 de la sesión paralela de Bitácora). |
 | 2026-08-06 | **H3a SELLADO** (`669a6e6`). Motores de densidad y verbos, tipados y persistidos. Dos decisiones de Victor corrigieron el plan §2.3 (ver 2.3.bis). El compuesto resultó amortiguar un clasificador que NO es determinista. Sin UI: espera diseño de Gemini. tsc y build limpios. |
+| 2026-08-07 | Diseño v2 → v3. El umbral pasó de "30 por gerencia, oculta" a "15 global, cambia el modo" — y con eso el endpoint de H3b.1 nació obsoleto. Se rehízo. |
+| 2026-08-08 | **H3b SELLADO.** Narrativa de Sonnet con doble capa anti-alucinación, tabla nueva, cron registrado, y las tres pantallas de la Cápsula 3. La tabla YA está en producción (`db push`). tsc y build limpios. |
 
 ---
 

@@ -419,3 +419,54 @@ La captura en BD es **completa**: cada `CalibrationAdjustment` guarda `adjustedB
 - file:line citados provienen del mapeo de las 14 fichas (`.claude/FICHA_PRODUCTOS/`). Confirmar línea exacta al abrir cada fix (el código se mueve).
 - Antes de cerrar un ítem de seguridad, verificar el patrón canónico en `GET /api/goals/route.ts` (RBAC 3 capas de referencia) y `AuthorizationService.PERMISSIONS`.
 - Los P0 de seguridad (P0-1) y los gates faltantes (P1-4/5/6, P2-1/2/3) comparten el mismo fix de 1 patrón → conviene hacerlos en una sola pasada de "auditoría RBAC".
+
+---
+
+## P0-5 · Seis crons construidos que NUNCA se ejecutan
+
+**Hallado el 2026-08-07** durante H3b de EX Clima, al buscar dónde enganchar el
+cron de la narrativa. No se tocó nada: está fuera de ese gate y son de otros
+módulos.
+
+`vercel.json` registra **5 crons** y en `src/app/api/cron/` hay **11 rutas**. Las
+seis que no están agendadas existen como código y nadie las llama:
+
+| Ruta | Qué queda sin correr |
+|---|---|
+| `benchmark-aggregation` | agregación de benchmarks (ya figuraba como **P0-3**) |
+| `compliance-process-pending` | **el worker de la cola `ComplianceAnalysis`** — los jobs quedan en PENDING para siempre |
+| `message-dispatcher` | despacho de la cola de mensajes (ya figuraba como **P0-2**) |
+| `exit-aggregation` | agregación de Exit |
+| `onboarding-effectiveness` | efectividad de Onboarding |
+| `send-alerts` | envío de alertas |
+
+**Por qué es P0 y no P2:** el modo de falla es SILENCIOSO. Un job que nunca se
+procesa no tira error — la UI cae a su estado vacío y se ve correcta. Nadie se
+entera hasta que alguien pregunta por qué un dato no aparece.
+
+⚠️ **Verificar el plan de Vercel antes de agregarlos.** Hobby limita la cantidad
+de cron jobs; si el proyecto está en Hobby, registrarlos todos no es posible y hay
+que priorizar o migrar a Pro. Ese dato no lo tengo.
+
+**Precedente que deja EX Clima:** el cron de la narrativa
+(`clima-narrative-refresh`) se agrega a `vercel.json` **en el mismo commit** que su
+ruta. Crear la ruta sin registrarla es exactamente cómo se llegó a esta lista.
+
+---
+
+## DEUDA-CLIMA-1 · La narrativa de efectividad lee planes desde JSON
+
+**Anotado el 2026-08-07** (H3b, EX Clima).
+
+`ClimaFindingNarrativeService` toma el contexto del plan —los pasos que se
+proponían para cada foco— desde `ActionPlan.decisiones`, que es un campo JSON.
+
+Hay un **proyecto paralelo en curso para persistir los planes en tablas propias**.
+Al migrar, hay que apuntar esa lectura a la fuente nueva.
+
+**Por qué importa más de lo que parece:** sin esos pasos, la narrativa pierde el
+"contra qué" —qué pedía el plan que nadie tocó— y vuelve a ser un recuento. Es
+justamente el insumo que la convierte en un hallazgo. Si la migración corta esa
+lectura sin reemplazarla, la funcionalidad no falla: **degrada en silencio**.
+
+Anotado también en la cabecera del propio servicio.

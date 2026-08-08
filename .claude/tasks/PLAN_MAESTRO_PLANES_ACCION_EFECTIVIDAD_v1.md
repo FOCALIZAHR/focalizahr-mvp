@@ -167,16 +167,36 @@ Implementado en `deriveCompositeSignal()`
 (`src/lib/services/clima/ClimaTextAnalysisService.ts`), función pura y sin LLM: el
 modelo clasifica, la regla de negocio vive en el código.
 
-**(b) Umbral de visibilidad: ≥30 entradas por gerencia.**
+**(b) Umbral: 15 entradas GLOBALES, y no oculta — cambia el modo.**
 
-§2.3 pedía volumen solo para el clustering (PRIORIDAD 2). Se extiende a TODOS los
-hallazgos de LLM que se le muestren al CEO: por debajo de 30 entradas por unidad
-de análisis, la UI muestra placeholder.
+> ⚠️ **CORREGIDO 2026-08-06.** Esta regla se fijó primero como "≥30 por gerencia,
+> y debajo la UI muestra placeholder". El diseño consolidado
+> (`DISENO_CONSOLIDADO_CASCADA_HALLAZGOS_v2.md` §1) la reemplazó y Victor lo
+> confirmó. Se deja el rastro porque hubo código construido contra la versión
+> vieja: el endpoint de H3b.1 nació devolviendo solo conteos bajo umbral.
 
-⚠️ **Es un gate de VISIBILIDAD, no de cómputo.** El clasificador corre y persiste
-desde la primera entrada, para que el día que se cruce el umbral haya historia
-acumulada y no haya que reprocesar hacia atrás. Constante:
-`CLIMA_LLM_MIN_ENTRIES_PER_UNIT` en `src/types/clima-text-analysis.ts`.
+El umbral **no decide si se muestra, decide CÓMO se muestra**:
+
+| | Modo Táctico | Modo Macro |
+|---|---|---|
+| Cuándo | < 15 entradas **globales** | ≥ 15 entradas globales |
+| Qué muestra | cada registro individual, con su cita, su autor y su etiqueta | patrones agregados por gerencia/empresa |
+| Para qué | auditoría de casos, trazabilidad | descubrimiento de patrones a escala |
+
+Con pocos datos, un porcentaje miente y un caso concreto no: por eso abajo se
+audita caso por caso y recién arriba se habla de patrones. **No hay nada que
+ocultar en ninguno de los dos modos** — la diferencia es la unidad de análisis.
+
+⚠️ **Sigue siendo un gate de VISIBILIDAD, no de cómputo.** El clasificador corre y
+persiste desde la primera entrada: si esperara volumen, al cruzar el umbral no
+habría historia acumulada y habría que reprocesar hacia atrás.
+
+**(c) El CEO nunca lee el vocabulario del motor** (diseño v2 §2). La UI traduce:
+"verbos de ejecución" → *Orientación a la Acción*; "densidad de entidades" →
+*Nivel de Especificidad Táctica*; "score compuesto" → *Índice de Confiabilidad
+Operativa*, con valores *Evidencia verificable* (≥2), *Evidencia parcial* (1) y
+*Sin evidencia operativa* (0). La densidad **no se muestra como fracción ni como
+barra**: ya está adentro del índice.
 
 **Además: apareció una conducta que §2.3 no contemplaba.** Ni ejecución ni
 intención — la REFUTACIÓN ("eso no es verdad"). Se agrupa hoy bajo `ninguno`,
