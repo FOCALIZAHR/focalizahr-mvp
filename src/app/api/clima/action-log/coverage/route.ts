@@ -36,6 +36,7 @@ const EMPTY: ClimaCoberturaDTO = {
   withAction: 0,
   pct: null,
   approvedAt: null,
+  lastEntryAt: null,
 };
 
 /** Cuenta cruda de una unidad, antes de agregar su subárbol. */
@@ -202,7 +203,7 @@ export async function GET(request: NextRequest) {
 
     const logs = await prisma.climaActionLog.findMany({
       where: { accountId: userContext.accountId, actionPlanId: plan.id },
-      select: { triggerRef: true, departmentId: true, actionText: true },
+      select: { id: true, triggerRef: true, departmentId: true, actionText: true },
     });
 
     const allowedDepartmentIds = await resolveAllowedDepartmentIds(userContext);
@@ -238,6 +239,18 @@ export async function GET(request: NextRequest) {
       nodeRows.map((n) => [n.id, { parentId: n.parentId, name: n.displayName }])
     );
 
+    // Última entrada escrita DENTRO DEL SCOPE. Se consulta acotada a los focos ya
+    // filtrados: un AREA_MANAGER no puede ver que otra gerencia registró ayer.
+    const ultima = await prisma.climaActionLogEntry.findFirst({
+      where: {
+        accountId: userContext.accountId,
+        climaActionLogId: { in: scoped.map((l) => l.id) },
+      },
+      orderBy: { createdAt: 'desc' },
+      select: { createdAt: true },
+    });
+    const lastEntryAt = ultima?.createdAt.toISOString() ?? null;
+
     const units = buildCoverageTree(tallyByDept, nodes);
 
     // Totales del scope. Se calculan sobre `scoped` y no sumando `units` para que
@@ -253,6 +266,7 @@ export async function GET(request: NextRequest) {
         withAction,
         pct: Math.round((withAction / total) * 100),
         approvedAt,
+        lastEntryAt,
       } satisfies ClimaCoberturaDTO,
     });
   } catch {

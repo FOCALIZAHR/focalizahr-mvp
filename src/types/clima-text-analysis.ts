@@ -78,20 +78,60 @@ export type ClimaTextConfidence = 'alta' | 'media' | 'baja';
 export const DENSITY_HIGH_THRESHOLD = 2;
 
 /**
- * Entradas mínimas por unidad de análisis (gerencia) para MOSTRARLE hallazgos de
- * LLM al CEO (decisión de Victor, 2026-08-06 — actualiza el plan maestro §2.3,
- * que solo lo pedía para el clustering).
+ * Entradas GLOBALES a partir de las cuales la cápsula pasa de Modo Táctico
+ * (auditoría caso por caso) a Modo Macro (patrones agregados).
+ * Diseño consolidado v2 §1 · plan maestro §2.3.bis.
  *
- * ⚠️ ES UN GATE DE VISIBILIDAD, NO DE CÓMPUTO. El clasificador corre y persiste
- * SIEMPRE, desde la primera entrada: los datos se acumulan para que el día que se
- * cruce el umbral haya historia que mostrar y no haya que reprocesar nada. Lo
- * único que espera es la UI.
+ * ⚠️ **NO DECIDE SI SE MUESTRA, DECIDE CÓMO.** Debajo del umbral se muestra cada
+ * registro individual —con su cita, su autor y su etiqueta—; encima, patrones
+ * agregados. Con pocos datos un porcentaje miente y un caso concreto no.
+ *
+ * ⚠️ Sigue siendo un gate de VISIBILIDAD, no de cómputo: el clasificador corre y
+ * persiste desde la primera entrada, para que al cruzar el umbral haya historia
+ * acumulada y no haya que reprocesar hacia atrás.
+ *
+ * 🕐 Se llamó `CLIMA_LLM_MIN_ENTRIES_PER_UNIT = 30` hasta el 2026-08-06. El nombre
+ * viejo decía "por unidad" y el umbral pasó a ser global: mantenerlo habría dejado
+ * una constante que miente sobre su propia semántica.
  *
  * Vive acá y no en `climaThresholds.ts` a propósito: ese archivo tiene los
- * umbrales SELLADOS de momentum (±5pp) y es de otro dominio. Mezclarlos obligaría
- * a tocar un archivo sellado para agregar algo que no tiene relación.
+ * umbrales SELLADOS de momentum (±5pp) y es de otro dominio.
  */
-export const CLIMA_LLM_MIN_ENTRIES_PER_UNIT = 30;
+export const CLIMA_MODO_MACRO_MIN_ENTRIES = 15;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ETIQUETAS EJECUTIVAS (diseño v2 §2)
+//
+// ⛔ EL CEO NUNCA LEE EL VOCABULARIO DEL MOTOR. No ve "ejecucion", "intencion",
+// "densidad" ni "score". La traducción se hace EN EL SERVIDOR —no en el cliente—
+// para que los términos internos ni siquiera viajen en la respuesta.
+//
+// `ejecucion` mapea a "Ejecución Comprobable" con CUALQUIER densidad: el matiz de
+// cuán concreta fue lo lleva el Índice de Confiabilidad ("Evidencia verificable"
+// vs. "Evidencia parcial"), como pide §3.3 — la densidad no se muestra aparte.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const ETIQUETA_EJECUTIVA: Record<ClimaVerbMode, string> = {
+  ejecucion: 'Ejecución Comprobable',
+  intencion: 'Promesa de Acción',
+  // "Observación sin Ejecución", nunca "Postura Defensiva": se califica la
+  // ausencia de ejecución, no la actitud de la persona (regla ética v2 §9).
+  ninguno: 'Observación sin Ejecución',
+};
+
+/** Orden del feed (§3.4): primero quienes ejecutaron, al final quienes no actuaron. */
+export const ORDEN_ETIQUETA: Record<ClimaVerbMode, number> = {
+  ejecucion: 0,
+  intencion: 1,
+  ninguno: 2,
+};
+
+/** Índice de Confiabilidad Operativa — el score compuesto, en palabras (§2). */
+export function indiceConfiabilidad(score: number): string {
+  if (score >= 2) return 'Evidencia verificable';
+  if (score === 1) return 'Evidencia parcial';
+  return 'Sin evidencia operativa';
+}
 
 /**
  * Fuerza de la señal de UNA entrada.

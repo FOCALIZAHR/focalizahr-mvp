@@ -107,6 +107,20 @@ const TOOL: AnthropicTool = {
   },
 };
 
+// El few-shot viene del diseño consolidado v2 §6 (Estudio IA). Se incorpora como
+// ejemplos en el system prompt, traducidos al vocabulario de ESTE tool: el §6 usa
+// `verbo`/`densidad_entidades`/`tipo_conductual`, y alimentar al modelo con nombres
+// de campo distintos a los de su propio schema lo confunde en vez de guiarlo.
+//
+// ⚠️ El ejemplo 2 CORRIGE una regla que este prompt tenía mal. Decía que todo texto
+// defensivo era "ninguno"; el §6 muestra que un texto de tono refutatorio que
+// reporta un hito consumado ("hicimos un taller el martes con los 15 líderes") es
+// EJECUCIÓN. Lo que decide no es el tono, es si hay un hecho cumplido.
+//
+// El §6 también trata `refutacion` como valor propio del verbo y agrega
+// `tipo_conductual`. NO se incorporan todavía: son cambios de contrato (agregar
+// valores a un union), y esa decisión es de Victor. La enseñanza sí se incorpora —
+// que es lo que mueve la calidad de la clasificación.
 const SYSTEM_PROMPT = `Eres un analista que clasifica registros breves escritos por jefes de área en Chile sobre acciones de clima laboral.
 
 Tu trabajo es SOLO clasificar. No opines sobre la persona, no evalúes si la acción fue buena, no redactes conclusiones.
@@ -114,9 +128,37 @@ Tu trabajo es SOLO clasificar. No opines sobre la persona, no evalúes si la acc
 Reglas:
 - El texto puede tener errores de tipeo, venir en MAYÚSCULAS o estar cortado. Clasifica igual, sin corregirlo.
 - Distingue el TIEMPO del verbo núcleo: lo ya hecho es ejecución; lo prometido, planificado o esperado es intención.
-- "Estoy esperando", "voy a", "me comprometo a" son INTENCIÓN, no ejecución.
-- Un texto que niega el hallazgo o se defiende no describe una acción: es "ninguno".
-- Extrae entidades VERBATIM. No inventes ni completes las que no estén.`;
+- "Estoy esperando", "voy a", "me comprometo a", "estamos analizando" son INTENCIÓN, no ejecución.
+- EL TONO NO DECIDE. Un texto puede sonar defensivo y aun así reportar un hecho
+  consumado: eso es EJECUCIÓN. Lo que decide es si hay un hito cumplido, no si el
+  autor está de acuerdo con el diagnóstico.
+- Un texto que solo niega, opina o se descarga, SIN reportar ningún hecho
+  consumado, es "ninguno".
+- Extrae entidades VERBATIM. No inventes ni completes las que no estén.
+
+EJEMPLOS RESUELTOS
+
+1) "Eso no es verdad, acá todos han crecido muchísimo este año según nuestras 3 metas cumplidas."
+   Plan: aumentar frecuencia de reuniones de feedback 1:1 en el área comercial.
+   → verb_mode: ninguno
+   Usa datos de metas para refutar la premisa, pero no describe ninguna acción
+   tomada sobre el plan de reuniones 1:1.
+
+2) "No es verdad que falte comunicación, hicimos un taller el martes pasado con los 15 líderes del piso."
+   Plan: mejorar canales de comunicación y alineación directiva.
+   → verb_mode: ejecucion · verb_lemma: "hicimos"
+   Aunque el tono es refutatorio, reporta un hito fáctico concreto: un taller
+   realizado el martes con 15 líderes. El tono no lo degrada a "ninguno".
+
+3) "Estamos analizando proponer un nuevo esquema de turnos para el próximo mes con el comité."
+   Plan: reducir la fatiga operativa y reestructurar horarios de salida.
+   → verb_mode: intencion · verb_lemma: "Estamos analizando"
+   Verbos de intención sin ningún hito consumado.
+
+4) "Modificamos la plantilla de turnos en Excel y la subimos al canal de Slack el lunes."
+   Plan: reducir la fatiga operativa y reestructurar horarios de salida.
+   → verb_mode: ejecucion · verb_lemma: "Modificamos"
+   Acción consumada con artefactos y plazos explícitos: plantilla Excel, Slack, lunes.`;
 
 /** Resumen de una corrida. Lo consume el log del cierre y el smoke. */
 export interface AnalysisRunResult {

@@ -252,6 +252,8 @@ model Account {
   // ═══════════════════════════════════════════════════
   complianceAnalyses       ComplianceAnalysis[]
   complianceAlerts         ComplianceAlert[]
+  // Clima — narrativa ejecutiva del hallazgo (H3b)
+  climaEffectivenessNarratives ClimaEffectivenessNarrative[]
   compliancePlanActions    CompliancePlanAction[]
 
   // ═══════════════════════════════════════════════════
@@ -373,6 +375,8 @@ model Campaign {
   // Compliance (Ambiente Sano) — análisis LLM por depto + meta
   complianceAnalyses    ComplianceAnalysis[]
   complianceAlerts      ComplianceAlert[]
+  // Clima — narrativa ejecutiva del hallazgo (H3b)
+  climaEffectivenessNarratives ClimaEffectivenessNarrative[]
   compliancePlanActions CompliancePlanAction[]
 
   // EX Clima — insights por departamento (referencia, no clave)
@@ -797,6 +801,8 @@ model Department {
   // Compliance (Ambiente Sano) — análisis LLM por depto
   complianceAnalyses ComplianceAnalysis[]
   complianceAlerts   ComplianceAlert[]
+  // Clima — narrativa ejecutiva del hallazgo (H3b)
+  climaEffectivenessNarratives ClimaEffectivenessNarrative[]
 
   // ═══════════════════════════════════════════════════
   // RELACIONES EMPLOYEE MASTER
@@ -4116,6 +4122,86 @@ model ClimaActionLogEntry {
 
   @@index([accountId, climaActionLogId])
   @@map("clima_action_log_entries")
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// CLIMA EFFECTIVENESS NARRATIVE — narrativa ejecutiva del hallazgo (EX Clima H3b)
+//
+// Output de Sonnet sobre el CONJUNTO de registros de bitácora que Haiku ya
+// clasificó. Es dato AGREGADO por plan: no cabe en ClimaActionLog (que es por
+// foco) ni en ActionPlan (modelo genérico multi-módulo, cuyos campos Json el
+// cliente sobreescribe enteros — ver /api/action-plans/[planId]:149).
+//
+// Los rows son también la cola de jobs (PENDING → RUNNING → COMPLETED | FAILED),
+// mismo patrón que ComplianceAnalysis. Los drena un cron; no se genera ni al
+// escribir una entrada ni al abrir la pantalla.
+//
+// UNA SOLA FILA GLOBAL POR PLAN (decisión de Victor, 2026-08-07). `scope` y
+// `departmentId` existen para no cerrar la puerta a narrativas por gerencia, pero
+// hoy TODOS —CEO, RRHH y AREA_MANAGER— leen la misma fila GLOBAL. Persistir una
+// por jefe serían decenas de llamadas a Sonnet para decir casi lo mismo.
+// ════════════════════════════════════════════════════════════════════════════
+model ClimaEffectivenessNarrative {
+  id           String  @id @default(cuid())
+  accountId    String  @map("account_id")
+  campaignId   String  @map("campaign_id")
+  actionPlanId String  @map("action_plan_id")   // el plan cuyos focos se analizan
+  scope        String  @default("GLOBAL")       // GLOBAL | DEPARTMENT
+  departmentId String? @map("department_id")    // null si scope=GLOBAL
+
+  // ── Cola de jobs ──
+  status       String    @default("PENDING")    // PENDING | RUNNING | COMPLETED | FAILED
+  errorMessage String?   @map("error_message") @db.Text
+  retryCount   Int       @default(0) @map("retry_count")
+  startedAt    DateTime? @map("started_at")
+  completedAt  DateTime? @map("completed_at")
+
+  // ── Invalidación ──
+  // Hash de las clasificaciones VIGENTES que se analizaron: SHA-256 sobre
+  // (entryId, verbMode, score) ordenado por entryId. Ordenado a propósito — si
+  // dependiera del orden de la query cambiaría sin que cambie nada real.
+  //
+  // ⚠️ El criterio es el HASH, no el conteo. Si alguien reclasifica sin agregar
+  // entradas, el conteo no se mueve pero la narrativa queda afirmando algo sobre
+  // una lectura que ya no existe.
+  classificationHash String @map("classification_hash")
+  // Contexto para leer la fila sin recalcular. NO es el criterio de invalidación.
+  entryCount         Int    @default(0) @map("entry_count")
+
+  // ── Output de Sonnet ──
+  headline  String?  @db.Text
+  soporte   String?  @db.Text
+  patron    String?
+  // Registros citados como respaldo. Auditoría de la Regla de Oro de Evidencia:
+  // sin esto no se puede reconstruir por qué el modelo afirmó lo que afirmó.
+  evidencia String[]
+  model     String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  account    Account     @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  campaign   Campaign    @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  department Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+
+  // ⚠️ El unique va por (actionPlanId, scope) y NO incluye departmentId, aunque
+  // parezca la clave natural. Razón: en Postgres `NULL != NULL`, así que un unique
+  // con una columna nullable NO impide duplicados en las filas donde esa columna es
+  // null — exactamente las GLOBAL, que son las únicas que existen hoy. Podrían
+  // entrar dos narrativas para el mismo plan sin que la base se queje.
+  //
+  // Así el constraint enforcea la regla real vigente: UNA fila por plan y scope.
+  // Cuando se agreguen filas DEPARTMENT (varias por plan, una por gerencia) habrá
+  // que revisarlo: la salida es un índice único parcial por SQL, que Prisma no
+  // sabe expresar en el schema.
+  //
+  // 📌 `ComplianceAnalysis` tiene la MISMA forma (`@@unique([campaignId, scope,
+  // departmentId])`) y por lo tanto el mismo agujero en sus filas ORG. No se toca
+  // desde acá — anotado en BACKLOG_ENTERPRISE.md.
+  @@unique([actionPlanId, scope], map: "unique_clima_effectiveness_narrative")
+  @@index([accountId, actionPlanId], map: "idx_clima_narrative_lookup")
+  @@index([status, createdAt], map: "idx_clima_narrative_status")
+  @@map("clima_effectiveness_narratives")
 }
 
 // ════════════════════════════════════════════════════════════════════════════
