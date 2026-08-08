@@ -2,142 +2,74 @@
 
 // src/app/dashboard/clima/components/planes/ClimaEfectividadHallazgos.tsx
 // ════════════════════════════════════════════════════════════════════════════
-// CONTENIDO de la Cápsula 3 — la pantalla a la que lleva el CTA de la portada.
+// PANTALLA 3 de la Cápsula 3 — LOS HALLAZGOS (qué dice lo que se registró).
 //
-// PANTALLA APARTE, no un bloque debajo: cuando esto se ve, la portada ya no está
-// (máquina de estados en `ClimaEfectividadView`).
+// Pantalla propia, no una sección debajo de la cobertura: el CEO navega hasta
+// acá. Son dos preguntas distintas —quién registró vs. qué dice lo que
+// registró— y cada una manda en su pantalla.
 //
-// ── LAYOUT 30/70 ─────────────────────────────────────────────────────────────
-// Reja porcentual `grid-cols-1 md:grid-cols-[30%_70%]`, el idioma de
-// `executive-hub/.../EvaluadorHeatmap.tsx:443` (que usa 40/60 para su master-detail).
-// Estructura del split tomada de `RoleFitDisplayCard.tsx:292` — identidad a la
-// izquierda, contenido a la derecha.
+// ── ESTRUCTURA (mockup `.claude/tasks/PANTALLA2_SEG_PLANES_CLIMA.JPG`) ───────
 //
-// ⚠️ De `RoleFitDisplayCard` se clona la ESTRUCTURA, no su chrome exterior: esa
-// card usa `bg-[#0F172A]/90 backdrop-blur-2xl rounded-[24px]`, que son los tokens
-// que `.claude/rules/frontend-design.md` marca como deuda del módulo compliance y
-// prohíbe replicar. Los paneles de acá usan los del PROPIO módulo
-// (`ClimaDimensionesView.tsx:279`): `rounded-xl border-slate-800/30 bg-slate-900/30`.
-// Por la misma razón se descartó `compliance/.../DecisionConsole.tsx`, que también
-// implementa un 30/70 pero es la deuda reconocida.
+//   IZQUIERDA · identidad, centrada        DERECHA · el análisis
+//     ícono púrpura grande                   ◈ IA · ANALISIS DE… ⓘ  ← rótulo
+//     8            ← número hero             headline de Sonnet
+//     registros analizados                   soporte de Sonnet
+//     ──────       ← divisor corto                              (v)
+//     Solo 1 registro presenta…
 //
-// ── LAS DOS ETAPAS ───────────────────────────────────────────────────────────
-// La cobertura y el veredicto NO son dos bloques pegados: el segundo DEPENDE del
-// primero. Sin registro no hay texto que cruzar contra la próxima medición, así
-// que la cápsula entera se cae. Se muestran encadenadas por un riel vertical con
-// dos marcadores — el mismo recurso (`border-l border-slate-800/40`) que el
-// drill-down de las filas usa para expresar pertenencia.
+// ⚠️ EL RÓTULO ES UN LABEL DE PANEL, NO UN TÍTULO DE PANTALLA. Vive DENTRO de
+// la columna derecha como su primer elemento, en 10px uppercase — el mismo lugar
+// y peso que "ADECUACIÓN AL CARGO" en `RoleFitDisplayCard.tsx:273`, de donde se
+// clonan sus tokens exactos (`text-[10px] font-bold uppercase tracking-[0.15em]`
+// + ícono `w-4 h-4` al lado).
 //
-// ── ESTADO ACTUAL (H2a) — Estado A del plan maestro §2.1 ─────────────────────
-//   · Cobertura de registro por gerencia.       ← construido
-//   · Cadencia táctica (cuándo escribieron).    ← diferida a H3
-//   · Cero LLM, cero cuadrantes, cero deltas: no hay veredicto todavía.
+// 🕐 Este bloque se reestructuró tres veces. Primero con un layout propio, después
+// clonando el `SpotlightCard` (que es el patrón de PERSONA, no de panel), después
+// con el título como header arriba del split. Las tres veces el error fue el
+// mismo: acomodar lo anterior en vez de abrir el molde correcto. El molde es el
+// rótulo de panel, y el mockup lo muestra sin ambigüedad.
 //
-// POR QUÉ LA CADENCIA NO ESTÁ: no es alcance recortado, es que no hay datos. La
-// única fuente de timestamps es `ClimaActionLogEntry.createdAt`, y escribir exige
-// resolver la identidad del jefe (`User.employeeId`), en NULL para toda la base
-// hasta la Etapa 3 del vínculo Employee↔User. Con 0 filas no hay serie.
+// El mockup viene en tema claro; acá se traduce al dark del sistema conservando
+// estructura, tamaños relativos y centrado.
+//
+// SISTEMA ELÁSTICO (v3 §3), decidido por el ENDPOINT y no acá:
+//   0 registros → Radar · 1 a 14 → Modo Táctico · 15+ → Modo Macro (sin diseñar)
 // ════════════════════════════════════════════════════════════════════════════
 
-import { useState, useEffect } from 'react';
-import { Gauge } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { BrainCircuit } from 'lucide-react';
 import { FHREmptyState } from '@/components/ui/FHREmptyState';
-import ClimaCoberturaGerencias from './ClimaCoberturaGerencias';
+import ClimaRadarEjecucion from './ClimaRadarEjecucion';
+import ClimaHallazgoCard from './ClimaHallazgoCard';
 import {
-  COBERTURA_TITLE,
-  COBERTURA_SUB,
-  COBERTURA_ETAPA_1,
-  COBERTURA_ETAPA_2,
-  PULSO_SIN_FECHA,
   HUB_EFECTIVIDAD_PENDIENTE,
-  pulsoDiasLabel,
-  pulsoActividad,
+  hallazgoSoporte,
 } from '@/lib/constants/climaHubContent';
-import type { ClimaCoberturaDTO } from '@/types/clima-hub';
+import type { ClimaFindingsDTO, ClimaNarrativeDTO } from '@/types/clima-hub';
 
-/** Color de identidad de la Cápsula 3, el mismo de su tarjeta en el hub. */
-const ACCENT = '#10B981';
+/** Color de la inteligencia (v3 §7): purple para todo lo que sale del motor. */
+const ACCENT_IA = '#A78BFA';
 
 interface ClimaEfectividadHallazgosProps {
-  campaignId: string | null;
-}
-
-/**
- * Un eslabón del flujo. El riel vertical baja desde el marcador y se corta en el
- * último (`isLast`), para que la cadena termine en algo y no en el vacío.
- */
-function Etapa({
-  label,
-  isLast,
-  children,
-}: {
-  label: string;
-  isLast?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="relative pl-6">
-      {/* Marcador */}
-      <span
-        className="absolute left-0 top-[5px] w-[9px] h-[9px] rounded-full border"
-        style={{ borderColor: `${ACCENT}60`, background: `${ACCENT}20` }}
-      />
-      {/* Riel hacia la etapa siguiente */}
-      {!isLast && (
-        <span className="absolute left-[4px] top-[18px] bottom-[-16px] w-px bg-slate-800/60" />
-      )}
-
-      <p className="text-[9px] uppercase tracking-[1.5px] text-slate-600 font-medium mb-2">
-        {label}
-      </p>
-      {children}
-    </div>
-  );
+  findings: ClimaFindingsDTO | null;
+  /** Narrativa de Sonnet, ya persistida por el cron. `null` = template. */
+  narrative?: ClimaNarrativeDTO | null;
 }
 
 export default function ClimaEfectividadHallazgos({
-  campaignId,
+  findings,
+  narrative,
 }: ClimaEfectividadHallazgosProps) {
-  const [cobertura, setCobertura] = useState<ClimaCoberturaDTO | null>(null);
-
-  useEffect(() => {
-    if (!campaignId) {
-      setCobertura(null);
-      return;
-    }
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch(`/api/clima/action-log/coverage?campaignId=${campaignId}`);
-        const json = await res.json();
-        if (!cancelled && json?.success) setCobertura(json.data);
-      } catch {
-        // Silencio: sin cobertura la pantalla sigue diciendo qué falta para el
-        // veredicto, que es su otra mitad. No se levanta un toast por esto.
-        if (!cancelled) setCobertura(null);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [campaignId]);
-
-  const units = cobertura?.units ?? [];
-  const hasUnits = units.length > 0;
-
-  // Días transcurridos desde la aprobación. Se trunca hacia abajo: el día 0 es el
-  // de la aprobación, y decir "1 día" a las tres horas sería redondear a favor.
-  const diasDesdeAprobacion =
-    cobertura?.approvedAt != null
-      ? Math.max(0, Math.floor((Date.now() - new Date(cobertura.approvedAt).getTime()) / 86_400_000))
-      : null;
-
-  // Gerencias (unidades de primer nivel) con al menos un foco registrado.
-  const unidadesConActividad = units.filter((u) => u.withAction > 0).length;
+  const hayRegistros = !!findings && findings.entriesAnalyzed > 0;
 
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-slate-800/40 bg-slate-900/60 backdrop-blur-sm">
-      {/* Tesla line del contenedor — firma de marca, no cambia con el contenido. */}
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35 }}
+      className="relative overflow-hidden rounded-2xl border border-slate-800/40 bg-slate-900/60 backdrop-blur-sm"
+    >
+      {/* Tesla line — firma de marca, no cambia con el contenido. */}
       <div
         className="absolute top-0 left-0 right-0 h-[2px]"
         style={{
@@ -147,74 +79,59 @@ export default function ClimaEfectividadHallazgos({
         }}
       />
 
-      <div className="px-4 py-5 md:px-6 md:py-6">
-        <div className="grid grid-cols-1 md:grid-cols-[30%_70%] gap-5 md:gap-6">
-          {/* ═══ 30% — IDENTIDAD DEL PRODUCTO ═══ */}
-          <div className="flex flex-col">
-            <div
-              className="w-10 h-10 rounded-xl flex items-center justify-center mb-4"
-              style={{ background: `${ACCENT}15` }}
-            >
-              <Gauge className="w-5 h-5" style={{ color: ACCENT }} />
-            </div>
-
-            <h3 className="text-base font-light text-white leading-tight">{COBERTURA_TITLE}</h3>
-
-            {/* ─── PULSO DE ACTIVIDAD ───
-                El hero de esta columna es el TIEMPO, no el porcentaje. El % global
-                ya lo dio la portada un clic antes y las cards dan el de cada
-                gerencia; los días son lo único que no está en ninguna de las dos y
-                que no se puede inferir mirándolas. Y son los que le dan peso al
-                conteo: "0 de 17" no dice lo mismo a los dos días que a los noventa.
-                En blanco y de tamaño fijo — el tiempo tampoco es un semáforo. */}
-            {diasDesdeAprobacion !== null ? (
-              <>
-                <p className="text-[44px] font-extralight text-white leading-[0.9] tabular-nums mt-3">
-                  {diasDesdeAprobacion}
-                </p>
-                <p className="text-[11px] font-light text-slate-500 mt-1">
-                  {pulsoDiasLabel(diasDesdeAprobacion)}
-                </p>
-              </>
-            ) : (
-              <p className="text-[11px] font-light text-slate-600 mt-3">{PULSO_SIN_FECHA}</p>
-            )}
-
-            {/* Estado de actividad — qué pasó en ese tiempo. */}
-            <p className="text-[13px] font-light text-slate-400 leading-relaxed mt-4">
-              {pulsoActividad(unidadesConActividad, units.length)}
-            </p>
-
-            {/* Qué NO es este dato. Sin esta línea, un 0% se lee como "fracasaron". */}
-            <p className="text-[11px] font-light text-slate-600 leading-relaxed mt-2">
-              {COBERTURA_SUB}
-            </p>
+      <div className="flex flex-col md:flex-row">
+        {/* ═══ IZQUIERDA · IDENTIDAD ═══
+            Centrada y sola: el ícono, el número, su bajada y —tras un divisor
+            corto— la frase de soporte. Nada más. El párrafo de Sonnet NO va acá:
+            pertenece al análisis, y el análisis vive a la derecha. */}
+        <div className="w-full md:w-[240px] md:flex-shrink-0 p-6 md:p-8 flex flex-col items-center justify-center text-center border-b md:border-b-0 md:border-r border-slate-800/40">
+          <div
+            className="w-16 h-16 rounded-full flex items-center justify-center mb-5"
+            style={{ background: `${ACCENT_IA}18` }}
+          >
+            <BrainCircuit className="w-8 h-8" style={{ color: ACCENT_IA }} />
           </div>
 
-          {/* ═══ 70% — LAS DOS ETAPAS DEL FLUJO ═══ */}
-          <div className="space-y-4">
-            <Etapa label={COBERTURA_ETAPA_1}>
-              {hasUnits ? (
-                <ClimaCoberturaGerencias units={units} />
-              ) : (
-                <div className="rounded-xl border border-slate-800/30 bg-slate-900/30 p-4">
-                  <p className="text-xs text-slate-600 font-light">
-                    Todavía no hay focos aprobados en esta medición.
-                  </p>
-                </div>
-              )}
-            </Etapa>
+          {hayRegistros && (
+            <>
+              <p className="text-[44px] font-extralight text-white leading-[0.9] tabular-nums">
+                {findings!.entriesAnalyzed}
+              </p>
+              <p className="text-[11px] font-light text-slate-500 mt-2">
+                {findings!.entriesAnalyzed === 1 ? 'registro analizado' : 'registros analizados'}
+              </p>
 
-            <Etapa label={COBERTURA_ETAPA_2} isLast>
-              <FHREmptyState
-                type="pending"
-                title={HUB_EFECTIVIDAD_PENDIENTE.title}
-                description={HUB_EFECTIVIDAD_PENDIENTE.description}
-              />
-            </Etapa>
-          </div>
+              {/* Divisor corto — separa "qué se midió" de "qué salió". */}
+              <div className="w-10 h-px bg-slate-700/50 my-4" />
+
+              <p className="text-[11px] font-light text-slate-400 leading-relaxed">
+                {hallazgoSoporte(findings!.executionCount)}
+              </p>
+            </>
+          )}
+        </div>
+
+        {/* ═══ DERECHA · EL ANÁLISIS ═══
+            El rótulo, el headline, el soporte y el chevron viven todos adentro de
+            `ClimaHallazgoCard`: es una sola unidad de lectura y partirla entre dos
+            archivos obligaría a sincronizar su orden desde afuera. */}
+        <div className="flex-1 min-w-0 p-6 md:p-8">
+          {!hayRegistros ? (
+            <ClimaRadarEjecucion data={findings ?? undefined} />
+          ) : findings!.mode === 'tactico' ? (
+            <ClimaHallazgoCard data={findings!} narrative={narrative} />
+          ) : (
+            // Modo Macro: los agregados se diseñan con datos reales cuando se
+            // crucen las 15 entradas (v3 §9). Hasta entonces, el estado honesto es
+            // el genérico — no un dashboard vacío.
+            <FHREmptyState
+              type="pending"
+              title={HUB_EFECTIVIDAD_PENDIENTE.title}
+              description={HUB_EFECTIVIDAD_PENDIENTE.description}
+            />
+          )}
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }

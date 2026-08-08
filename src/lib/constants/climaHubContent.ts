@@ -157,7 +157,16 @@ export const CAPSULA_EFECTIVIDAD_SIN_MEDICION = 'Pendiente de medición';
  * de Clima llevan el suyo en el mismo lugar (`ClimaPlanPortada.tsx:106`
  * "Comenzar", `ClimaPortada.tsx:82`).
  */
-export const EFECTIVIDAD_CTA = 'Ver hallazgos';
+/**
+ * CTA de la PORTADA → lleva a la pantalla de cobertura.
+ * Cada CTA nombra su destino (diccionario de verbos de la skill de diseño): la
+ * portada no lleva a los hallazgos, lleva a la cobertura, y decir "Ver hallazgos"
+ * ahí prometería una pantalla que todavía no es la siguiente.
+ */
+export const EFECTIVIDAD_CTA = 'Ver cobertura';
+
+/** CTA de la pantalla de COBERTURA → lleva a los hallazgos del motor. */
+export const COBERTURA_CTA = 'Ver hallazgos';
 
 export function capsulaEfectividadMetric(
   measured: number,
@@ -236,8 +245,12 @@ export function coberturaUnidadesLabel(n: number): string {
  * primera — sin registro no hay nada que cruzar contra la próxima medición, y por
  * eso se muestran encadenadas y no una al lado de la otra.
  */
-export const COBERTURA_ETAPA_1 = 'Lo que ya se registró';
-export const COBERTURA_ETAPA_2 = 'Lo que falta para el veredicto';
+// 🕐 RETIRADAS. `COBERTURA_ETAPA_1` y `COBERTURA_ETAPA_2` rotulaban las dos etapas
+// encadenadas por un riel vertical, cuando cobertura y hallazgos vivían en la misma
+// pantalla. Al separarse en dos pantallas (v3, corrección 1) el riel desapareció y
+// con él sus rótulos: cada pantalla se presenta sola, con su propio panel de
+// identidad. Se borran en vez de dejarse "por si acaso" — una constante sin
+// consumidor es una pista falsa para el que lea esto en tres meses.
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Pulso de actividad — el panel del 30%.
@@ -250,13 +263,28 @@ export const COBERTURA_ETAPA_2 = 'Lo que falta para el veredicto';
 // noventa.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Bajada del número hero. El número va aparte, en grande. */
+/**
+ * Bajada del número hero. El número va aparte, en grande.
+ *
+ * 🕐 Decía "días desde la aprobación" hasta el 2026-08-08. Se cambió a la última
+ * entrada porque la antigüedad del plan NO SE MUEVE: a los 17 días dice 17 y
+ * mañana 18, pase lo que pase. "Último registro hace 2 días" mide si el equipo
+ * sigue vivo, que es la pregunta de esta pantalla.
+ */
 export function pulsoDiasLabel(dias: number): string {
-  return `${dias === 1 ? 'día' : 'días'} desde la aprobación`;
+  if (dias === 0) return 'último registro, hoy';
+  return `${dias === 1 ? 'día' : 'días'} desde el último registro`;
 }
 
-/** Sin fecha de aprobación sellada (planes viejos): no se inventa un número. */
-export const PULSO_SIN_FECHA = 'Sin fecha de aprobación registrada.';
+/** Sin ninguna entrada escrita. Sin número: no hay nada que contar. */
+export const PULSO_SIN_FECHA = 'Sin registros';
+
+// ── Título de la pantalla de cobertura (word-split canónico) ─────────────────
+export const COBERTURA_TITULO = { first: 'Cobertura de', second: 'Registro' } as const;
+
+/** Narrativa bajo el título. Qué se está mirando, en una frase. */
+export const COBERTURA_NARRATIVA =
+  'Qué unidades dejaron registro de lo que hicieron con sus focos.';
 
 /**
  * Estado de actividad, en una línea. Describe lo que hay; no reclama lo que
@@ -273,6 +301,195 @@ export function pulsoActividad(conActividad: number, totalUnidades: number): str
     return `Las ${totalUnidades} gerencias registraron actividad.`;
   }
   return `${conActividad} de ${totalUnidades} gerencias registraron actividad.`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RADAR DE EJECUCIÓN — Estado 1 de la cascada de hallazgos (H3b).
+// Diseño: `DISENO_CASCADA_HALLAZGOS_CAPSULA3.md` §1.
+//
+// Cadenas VERBATIM del diseño de Gemini ("no se desvía de esto"), auditadas
+// contra la skill de narrativas antes de fijarlas: tuteo neutro, cero jerga
+// técnica visible (no dice "clasificador", "LLM" ni "score"), y ninguna
+// instrucción — describe lo que pasa, no pide que se haga algo.
+//
+// ⛔ ACÁ NO SE NOMBRA NADA INDIVIDUAL. Bajo el umbral no hay nombres de jefes, ni
+// densidades, ni señales, ni verbos. Y no es solo que la UI no los pinte: el
+// endpoint tampoco los manda (ver `api/clima/action-log/findings/route.ts`).
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const RADAR_TITLE = { first: 'Radar de', second: 'Ejecución' } as const;
+
+export const RADAR_SUBTITLE =
+  'El motor analiza cada registro. Cuando haya suficiente volumen, los hallazgos aparecen acá.';
+
+/** Bajada del ring. El número va en el anillo; esto lo nombra. */
+export function radarCaptured(analyzed: number, threshold: number): string {
+  return `${analyzed}/${threshold} registros capturados`;
+}
+
+export const RADAR_CLOSING = 'El análisis se acumula con cada entrada en la bitácora.';
+
+/**
+ * Avance por gerencia, en una línea.
+ *
+ * No está en el diseño §1, que muestra un único "8/30". Se agrega porque el
+ * umbral es POR UNIDAD: con 8 registros globales repartidos en dos gerencias
+ * (6 y 2), un anillo global al 27% sugiere que falta poco para TODO, cuando en
+ * realidad ninguna unidad está cerca. Sin esta línea la pantalla no miente por
+ * mala fe, pero induce a una lectura falsa.
+ */
+export function radarPorUnidad(units: Array<{ departmentName: string; entriesAnalyzed: number }>): string {
+  return units.map((u) => `${u.departmentName} ${u.entriesAnalyzed}`).join(' · ');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MODO TÁCTICO — feed de auditoría caso por caso (diseño v2 §3).
+//
+// ⛔ EL CEO NO LEE EL VOCABULARIO DEL MOTOR. Acá no hay "verbos", "densidad",
+// "score" ni "NLP". Las etiquetas de cada tarjeta llegan YA TRADUCIDAS desde el
+// servidor (`types/clima-text-analysis.ts` → `ETIQUETA_EJECUTIVA`), así que este
+// archivo solo aporta el chrome de la sección.
+//
+// ⛔ SIN PORCENTAJES BAJO EL UMBRAL (v2 §3.5). Con 8 registros, "13% ejecuta"
+// suena a estadística y no lo es: un caso más lo mueve 12 puntos. Conteos
+// absolutos, que no prometen una precisión que la muestra no tiene.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ── Acto 1 · El gancho de la portada (v3 §2) ─────────────────────────────────
+//
+// Headline por TEMPLATE, no por LLM (v3 §13, Opción A): con tres tramos fijos el
+// resultado es predecible, gratis e idéntico entre corridas. Si algún día se
+// siente mecánico, se migra a Sonnet sin tocar a quien lo consume.
+//
+// Los tres tramos no son cosmética: cambian la FRASE PROTAGONISTA según dónde
+// está la empresa. Con ejecución baja, el dato que importa es cuántos NO
+// ejecutaron; con ejecución alta, cuántos SÍ. Decir siempre lo mismo obligaría al
+// lector a hacer la resta.
+
+const EJECUCION_BAJA = 0.25;
+const EJECUCION_ALTA = 0.75;
+
+/** El gancho. `total` = registros analizados; `ejecutados` = con ejecución comprobable. */
+export function portadaHallazgoHeadline(total: number, ejecutados: number): string {
+  if (total === 0) return '';
+  const ratio = ejecutados / total;
+  const sin = total - ejecutados;
+
+  if (ratio < EJECUCION_BAJA) {
+    return `${sin} de ${total} ${total === 1 ? 'registro no presenta' : 'registros no presentan'} evidencia de ejecución.`;
+  }
+  if (ratio <= EJECUCION_ALTA) {
+    return `${ejecutados} de ${total} ${ejecutados === 1 ? 'registro presenta' : 'registros presentan'} ejecución comprobable. El resto permanece en intención declarativa.`;
+  }
+  return `${ejecutados} de ${total} ${ejecutados === 1 ? 'registro presenta' : 'registros presentan'} ejecución comprobable.`;
+}
+
+/** Subtexto fijo de la portada (v3 §2). Explica qué hace el sistema, sin jerga. */
+export const PORTADA_HALLAZGO_SUBTEXT =
+  'FocalizaHR analiza cada registro para distinguir lo ejecutado de lo prometido.';
+
+// ── Acto 3 · Nivel 1, el hallazgo protagonista (v3 §2) ───────────────────────
+
+/**
+ * La conclusión, arriba de todo (Minto). Habla del PATRÓN, nunca de una persona:
+ * "6 de 8 líderes registran lo que van a hacer" — no "6 líderes no cumplieron".
+ *
+ * `promesas` sale de las tarjetas ya clasificadas por el servidor, no de un
+ * cálculo nuevo: es cuántas quedaron en el grupo de intención.
+ */
+export function hallazgoHeadline(total: number, promesas: number): string {
+  if (total === 0) return '';
+  if (promesas === 0) {
+    return `Los ${total} registros describen acciones ya ejecutadas.`;
+  }
+  return `${promesas} de ${total} ${promesas === 1 ? 'líder registra' : 'líderes registran'} lo que van a hacer, no lo que ya hicieron.`;
+}
+
+/** El argumento que sostiene el headline. */
+export function hallazgoSoporte(ejecutados: number): string {
+  if (ejecutados === 0) return 'Ningún registro presenta evidencia comprobable de ejecución.';
+  if (ejecutados === 1) return 'Solo 1 registro presenta evidencia comprobable de ejecución.';
+  return `${ejecutados} registros presentan evidencia comprobable de ejecución.`;
+}
+
+/** Pie del hallazgo, junto al chevron. Conteo absoluto: bajo 15 no hay porcentajes. */
+export function hallazgoConteo(total: number): string {
+  return `${total} ${total === 1 ? 'registro analizado' : 'registros analizados'}`;
+}
+
+/** Rótulo del acordeón de evidencia. */
+export const HALLAZGO_VER_EVIDENCIA = 'Ver evidencia';
+export const HALLAZGO_OCULTAR_EVIDENCIA = 'Ocultar evidencia';
+
+// ── Título de la sección de hallazgos ────────────────────────────────────────
+// "IA" va suelto para poder pintarlo en púrpura: es el color con que TODO el
+// sistema marca lo que sale de un motor (v3 §7). Decir "IA" en el título es
+// declarar de dónde viene lo que se lee abajo — el CEO tiene derecho a saber que
+// está leyendo una lectura de máquina, no una observación directa.
+// 🕐 RETIRADA. `IA_CONTEXTO = 'Planes de Acción'` era el rótulo de contexto de un
+// header arriba del split, cuando el título se trató como título de PANTALLA. El
+// mockup lo define como rótulo de PANEL, adentro de la columna derecha, y ahí no
+// hay línea de contexto separada.
+
+/**
+ * Título en word-split, como pide el Patrón G: primera parte en blanco, segunda
+ * en `fhr-title-gradient`. `badge` va aparte para pintarlo en púrpura — declara
+ * que lo que se lee abajo salió de un motor, no de una observación directa.
+ */
+export const IA_TITULO = {
+  badge: 'IA',
+  first: 'Análisis de',
+  second: 'Acciones de Clima',
+} as const;
+
+/**
+ * Qué hay detrás del título. Va en tooltip y no en pantalla: es la explicación
+ * para quien pregunta, no algo que el CEO deba leer para entender el hallazgo.
+ */
+export const IA_TOOLTIP =
+  'Análisis de bitácoras asistido por IA con validación estructural y cruce de impacto causal con control de alucinaciones.';
+
+/** Encabezado del bloque de evidencia, al desplegar. */
+export const EVIDENCIA_HEADER = 'Registros analizados';
+
+/** Botón para ver el resto de las tarjetas cuando pasan de 10. */
+export function evidenciaVerRestantes(restantes: number): string {
+  return `Ver ${restantes === 1 ? 'el restante' : `los ${restantes} restantes`}`;
+}
+
+/** Máximo de tarjetas visibles antes de pedir el resto. */
+export const EVIDENCIA_VISIBLE_MAX = 10;
+
+// 🕐 RETIRADA. `TACTICO_HEADER = 'Orientación a la Acción'` titulaba la sección
+// hasta que el título pasó a ser "IA · Análisis de Acciones de Clima" (decisión de
+// Victor, 2026-08-07) y subió arriba del 30/70. Quedó sin un solo consumidor: se
+// borra en vez de dejarse "por si acaso", que es como se juntan las constantes
+// fantasma que después nadie sabe si están vivas.
+export const TACTICO_SUB = 'Auditoría táctica de los registros de bitácora.';
+
+/** "8 registros analizados · 1 con ejecución comprobable". Sin porcentajes. */
+export function tacticoConteo(total: number, conEjecucion: number): string {
+  const reg = `${total} ${total === 1 ? 'registro analizado' : 'registros analizados'}`;
+  const eje = `${conEjecucion} con ejecución comprobable`;
+  return `${reg} · ${eje}`;
+}
+
+/** Pie de tarjeta: "Liderazgo · Atención a Clientes". */
+export function tacticoContexto(dimension: string | null, departamento: string): string {
+  return dimension ? `${dimension} · ${departamento}` : departamento;
+}
+
+/**
+ * Fecha de la entrada, formato corto ("6 ago 2026" — v2 §3.2).
+ * `Intl` en vez de date-fns: es una sola fecha corta y no justifica arrastrar el
+ * locale de la librería a este árbol.
+ */
+export function tacticoFecha(iso: string): string {
+  return new Intl.DateTimeFormat('es-CL', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  }).format(new Date(iso));
 }
 
 export const HUB_EFECTIVIDAD_PENDIENTE = {
